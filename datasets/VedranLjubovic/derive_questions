@@ -1,0 +1,7 @@
+#!/bin/bash
+
+for file in `ls chosen/`
+do
+  echo "File: chosen/$file"
+  python data_grabber.py chosen/$file >> logs/$file.log
+done
