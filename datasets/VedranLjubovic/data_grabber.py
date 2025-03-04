@@ -7,12 +7,18 @@ import pandas as pd
 
 question_generation_prompt = """You will be given c langauge code from a file. Your job will be to generate a first-year university computer science course assignment question that the student would have written the code for. 
 
-Write the assignment question in clear, structured English, formatted into paragraphs, providing clear learning outcomes."""
+Write the assignment question in clear, structured English, formatted into paragraphs, providing clear learning outcomes. The code is written in another language."""
 
 question_verification_prompt = "Verify that the following assignment question compares to one seen in a first year computer science course, and is written in only English, not including any variable or function names. Write either 'ANSWERYES' or 'ANSWERNO'. Verify the following text:"
 question_verification_prompt_2 = "Is this text in English words and have the an assignment title? Respond with 'ANSWERYES' or 'ANSWERNO'. Here is the text:"
 summarization_prompt = """Summarize the following assignment question into a single paragraph. The summary should be concise and capture what type of program needs to be written, and what problem it is solving. Do not include any new information in the summary. """
 
+
+def verifyResponse(question: str):
+  if(question.find("Assignment") != -1):
+    return "ANSWERYES"
+  else:
+    return "ANSWERNO"
 #figure out how to format stuff
 def retrieveResponse(prompt: str, question: str): 
     response = chat(model='llama3.1', messages=[ #14b
@@ -49,11 +55,15 @@ if __name__ == '__main__':
   file.close()
 
   print("Generating Problem Statement")
-  question_response = retrieveResponse(question_generation_prompt, code)
+  if(questions.loc[questions['identifier'] == questionIdentifier].shape[0] > 0):
+    print("Already Generated")
+    question_response = questions.loc[questions['identifier'] == questionIdentifier].iloc[0]['question']
+  else:
+    question_response = retrieveResponse(question_generation_prompt, code)
 
   print("Verifying Question")
   retryCount = 0
-  verification_response = retrieveResponse(question_verification_prompt, question_response)
+  verification_response = verifyResponse(question_response)
   while(verification_response.find("ANSWERYES") == -1):
     print("Failed Verification")
     retryCount += 1
@@ -65,7 +75,7 @@ if __name__ == '__main__':
     print("Retry #" + str(retryCount) + ": Generating Problem Statement")
     question_response = retrieveResponse(question_generation_prompt, code)
     print("Verifying Question")
-    verification_response = retrieveResponse(question_verification_prompt, question_response)
+    verification_response = verifyResponse(question_response)
 
   print("Passed Verification")
 
