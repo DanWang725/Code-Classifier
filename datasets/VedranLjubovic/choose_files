@@ -1,21 +1,30 @@
 #!/bin/bash
 
+if [ $# -ne 1 ]
+then
+  echo "Error: Expected 1 argument, got $#"
+  echo "Usage: $0 <nsamples>"
+  echo "nsamples: the number of samples for each question"
+  exit 1
+fi
 
-
+if [ $1 -lt 1 ]
+then
+  echo "Error: Expected non-zero number of samples, got $1"
+  exit 1
+fi
 
 cd ./src/A2016
 outputBase='../../chosen/'
-
+rm -rf chosen/*
 
 for dir in `ls -d */`
 do
-  echo $dir
   for dir2 in `ls -d $dir*/`
   do
     echo "$dir2: Filecount: $(ls -1 $dir2 | wc -l)"
     prefix_dir=(`echo $dir2 | tr \/ -`)
-    readarray -t -n 10 pathnames < <( find $dir2 -type f | shuf -n 10 )
-    # readarray -t -d '' pathnames < <( find $dir2 -type f -print0 | shuf -z )
+    readarray -t -n 10 pathnames < <( find $dir2 -type f | shuf -n $1 )
     for pathname in "${pathnames[@]}"
     do
       filenumber=(`echo $pathname | cut -c 10-30 | tr -cd '[[:digit:]]'`)
