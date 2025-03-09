@@ -1,0 +1,7 @@
+#!/bin/bash
+
+cd deepseek-r1-8b-0t
+ollama create deepseek-r1-8b-0t
+cd ../deepseek-r1-14b-0t
+ollama create deepseek-r1-14b-0t
+echo "Models Created"
