@@ -5,6 +5,10 @@ import pandas as pd
 from alive_progress import alive_bar
 import json
 import os
+from ml_utils import data_files_directory
+
+data_files_output_directory = data_files_directory + "ai-code/"
+output_file = "output.csv"
 
 def getCodeFromResponse(content: str):
     matches = re.search(r"```c(.+?)```", content, re.DOTALL)
@@ -49,10 +53,11 @@ def generateCodeFromChatWithRetry(question: str, response: str):
     return cleaned_content
 
 def generate(source: pd.DataFrame):
-    if(os.path.exists("output.csv")):
-        output = pd.read_csv("output-2.csv")
+    if(os.path.exists(data_files_output_directory + output_file)): # If the output file exists, load it
+        output = pd.read_csv(data_files_output_directory + output_file)
         outputCode = output['code'].tolist()
         label = output['actual label'].tolist()
+        os.rename(data_files_output_directory + output_file, data_files_output_directory + output_file + ".bak")
     else:
         output = source.loc[:, 'identifier'].to_frame()
         outputCode = [None for x in range(len(source))]
@@ -86,8 +91,8 @@ def generate(source: pd.DataFrame):
     output['code'] = outputCode
     output['actual label'] = label
 
-    output.to_csv("output-2.csv", index=False)
+    output.to_csv(data_files_output_directory + output_file, index=False)
 
 if __name__ == "__main__":
-    df = pd.read_pickle("questions.pkl")
+    df = pd.read_pickle(data_files_output_directory + "questions.pkl")
     generate(df)

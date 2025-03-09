@@ -7,6 +7,7 @@ import re
 import pandas as pd
 from alive_progress import alive_bar
 from tqdm import tqdm
+from ml_utils import data_files_directory, dataset_files_directory
 
 question_generation_prompt = """You will be given c langauge code from a file. Your job will be to generate a first-year university computer science course assignment question that the student would have written the code for.
 
@@ -77,52 +78,11 @@ def insert_df(df: pd.DataFrame, row: list):
 
 def open_pickle(file_path: str, columns: list):
     if(os.path.exists(file_path)):
-      return pd.read_pickle(file_path)
+      source = pd.read_pickle(file_path)
+      os.rename(file_path, file_path + ".bak")
+      return source
     else:
       return pd.DataFrame(columns=columns)
-
-def old_loop():
-  questionIdentifier = re.search(r'([A-Z]\d-[A-Z]\d-\d+)', sys.argv[1])[1]
-  questions = open_pickle("questions.pkl", ["question", "identifier"])
-
-  if(len(sys.argv) != 2):
-    print("Usage: python data_grabber.py <input_file>")
-    sys.exit(1)
-  file = open(sys.argv[1], "r")
-  code = "\n".join(file.readlines())  
-  file.close()
-
-  print("Generating Problem Statement")
-  if(questions.loc[questions['identifier'] == questionIdentifier].shape[0] > 0):
-    print("Already Generated")
-    question_response = questions.loc[questions['identifier'] == questionIdentifier].iloc[0]['question']
-  else:
-    question_response = retrieveResponse(question_generation_prompt, code)
-
-  print("Verifying Question")
-  retryCount = 0
-  verification_response = verifyResponse(question_response)
-  while(verification_response.find("ANSWERYES") == -1):
-    print("Failed Verification: " + question_response[0:100])
-    retryCount += 1
-    if(retryCount >= 3):
-      sys.stderr.write(questionIdentifier + " RETRIED TOO MANY TIMES \n")
-      sys.exit(1)
-    
-    sys.stderr.write(questionIdentifier + " RETRY " + str(retryCount) + "\n")
-    print("Retry #" + str(retryCount) + ": Generating Problem Statement")
-    question_response = retrieveEnglishRetry(question_generation_prompt, code, question_response)
-    print("Verifying Question")
-    verification_response = verifyResponse(question_response)
-
-  print("Passed Verification: " + question_response[0:100])
-
-  print("Generating Summary")
-  summary_response = retrieveResponse(summarization_prompt, question_response)
-  print("Saving....")
-  questions = insert_df(questions, [question_response, questionIdentifier])
-  # questions.to_pickle("questions.pkl")
-  print(summary_response)
 
 def load_question(file_path: str, questions: pd.DataFrame, bar: any):
   questionIdentifier = re.search(r'([A-Z]\d-[A-Z]\d-\d+)', file_path)[1]
@@ -184,7 +144,7 @@ if __name__ == '__main__':
   files = os.listdir(code_dir)
   print(f"Reading {len(files)} files from {code_dir}")
   sleep(5)
-  questions = open_pickle("questions.pkl", ["question", "identifier"])
+  questions = open_pickle(data_files_directory + "ai-code/questions.pkl", ["question", "identifier"])
 
   with alive_bar(len(files), dual_line=True) as bar:
     for file in files:
