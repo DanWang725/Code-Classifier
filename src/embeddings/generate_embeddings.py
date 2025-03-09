@@ -50,7 +50,7 @@ def get_embedding(text, tokenizer, model, chunk_size=512, overlap=50):
         embeddings.append(chunk_embedding)
     
     # Aggregate the embeddings (e.g., by averaging)
-    aggregated_embedding = torch.mean(torch.stack(embeddings), dim=0).cpu()
+    aggregated_embedding = torch.mean(torch.stack(embeddings), dim=0).cpu().numpy()
     
     return aggregated_embedding
 
