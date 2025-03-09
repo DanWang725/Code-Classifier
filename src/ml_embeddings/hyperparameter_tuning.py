@@ -11,6 +11,7 @@ from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier
 from sklearn.ensemble import VotingClassifier, BaggingClassifier, GradientBoostingClassifier
 import pickle
+from embedding import prepare_data
 
 tuned_model_list_datas = defaultdict()
 i = 0
@@ -25,8 +26,7 @@ print(f'--> {emb_type}')
 
 # filtered_data['code_embeddings'] = filtered_data['code_embeddings'].apply(lambda x: x.flatten())
 
-data_expanded = pd.DataFrame(data['code_embeddings'].tolist(), index=data.index)  # Expands each ndarray into separate columns
-filtered_data = pd.concat([data_expanded, data[['actual label']]], axis=1)
+filtered_data = prepare_data(data, 'code_embeddings', 'actual label')
 
 print("flattened data")
 # print(filtered_data.shape)

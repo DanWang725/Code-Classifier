@@ -20,11 +20,14 @@ from scipy import stats
 from tqdm import tqdm
 import os
 import warnings
+from embedding import expand_embeddings
 
 warnings.filterwarnings('ignore')
 
 
 def calculate_metrics(label, pred):
+    label = replace_label(label)
+    pred = replace_label(pred)
     acc = accuracy_score(label, pred)
     pre = precision_score(label, pred)
     rec = recall_score(label, pred)
@@ -43,7 +46,7 @@ def calculate_metrics(label, pred):
 def replace_label(labels):
     new_labels = []
     for label in labels:
-        if label == 'lm':
+        if label == 'llm':
             new_labels.append(0)
         elif label == 'human':
             new_labels.append(1)
@@ -69,74 +72,58 @@ def get_hyperparameters(estimator):
         hyperparameters[key] = value
     return hyperparameters
 
+data_file_path = "../../data/prepared/"
 
-
-split_data_path = ''
-
-emb_types = ['ast_', 'combined_', 'code_']
-model_type = 'lr'
-with open(f'', 'rb') as f:
-    tuned_models = pickle.load(f)
-
-print(f'Model: {model_type}')
-
-ast_f1_list, combined_f1_list, code_f1_list = [], [], []
-for dataset in ['chatgpt_', 'gemini', 'chatgpt4']:
+def test_model():
     auroc_list, acc_list, tpr_list, tnr_list, human_f1_list, ai_f1_list, f1_list = [], [], [], [], [], [], []
 
-    print(dataset)
-    for folder_name in os.listdir(split_data_path):
-        file_names =  os.listdir(split_data_path+folder_name)
-        train_file_name = [x for x in file_names if 'train' in x][0]
-        test_file_name = [x for x in file_names if 'test' in x][0]
+    train_file_name = data_file_path + "train.pkl"
+    test_file_name = data_file_path + "test.pkl"
 
-        train_df = pd.read_csv(split_data_path+folder_name+'/'+train_file_name)
-        test_df = pd.read_csv(split_data_path+folder_name+'/'+test_file_name)
+    train_df = pd.read_pickle(train_file_name)
+    test_df = pd.read_pickle(test_file_name)
 
-        output_df = pd.DataFrame(columns=['idx', 'code', 'ast', 'actual label', 'pred'])
+    output_df = pd.DataFrame(columns=['idx', 'code', 'ast', 'actual label', 'pred'])
 
-        for type in emb_types:
-            X_train = train_df.loc[:, train_df.columns.str.startswith(type)]
-            X_test = test_df.loc[:, test_df.columns.str.startswith(type)]
-            y_train = train_df['actual label']
-            y_test = test_df['actual label']
+    for type in emb_types:
+        X_train = expand_embeddings(train_df, 'code_embeddings')
+        X_test = expand_embeddings(test_df, 'code_embeddings')
+        y_train = train_df['actual label']
+        y_test = test_df['actual label']
 
-            # print(f'Train shape: {X_train.shape}, Test shape: {X_test.shape}')
+        # print(f'Train shape: {X_train.shape}, Test shape: {X_test.shape}')
 
-            tuned_clf = tuned_models[folder_name+type][0]
-            clf = LogisticRegression()
-            all_params = tuned_clf.get_params(deep=False)
+        tuned_clf = tuned_models[type][0]
+        clf = GradientBoostingClassifier()
+        all_params = tuned_clf.get_params(deep=False)
 
-            clf.set_params(**all_params)
-            clf.fit(X_train, y_train)
-            pred = clf.predict(X_test)
-            acc, tpr, tnr, f1, human_f1, ai_f1 = calculate_metrics(y_test, pred)
-            avg_f1 = (human_f1+ai_f1)/2
+        clf.set_params(**all_params)
+        clf.fit(X_train, y_train)
+        pred = clf.predict(X_test)
+        acc, tpr, tnr, f1, human_f1, ai_f1 = calculate_metrics(y_test, pred.tolist())
+        avg_f1 = (human_f1+ai_f1)/2
 
-            print(f'Dataset: {folder_name}, Type: {type}')
-            print(f'--> Accuracy: {round(acc, 4)} TPR: {round(tpr, 4)} TNR: {round(tnr, 4)} Human_F1: {round(human_f1, 4)} AI_F1: {round(ai_f1, 4)} Avg_F1: {round(avg_f1, 4)}')
+        print(f'Dataset: test, Type: {type}')
+        print(f'--> Accuracy: {round(acc, 4)} TPR: {round(tpr, 4)} TNR: {round(tnr, 4)} Human_F1: {round(human_f1, 4)} AI_F1: {round(ai_f1, 4)} Avg_F1: {round(avg_f1, 4)}')
 
-            acc_list.append(acc)
-            tpr_list.append(tpr)
-            tnr_list.append(tnr)
-            human_f1_list.append(human_f1)
-            ai_f1_list.append(ai_f1)
-            f1_list.append(avg_f1)
+        acc_list.append(acc)
+        tpr_list.append(tpr)
+        tnr_list.append(tnr)
+        human_f1_list.append(human_f1)
+        ai_f1_list.append(ai_f1)
+        f1_list.append(avg_f1)
 
-            if type == 'ast_':
-                ast_f1_list.append(avg_f1)
-            elif type == 'combined_':
-                combined_f1_list.append(avg_f1)
-            elif type == 'code_':
-                code_f1_list.append(avg_f1)
+        # if type == 'ast_':
+        #     ast_f1_list.append(avg_f1)
+        # elif type == 'combined_':
+        #     combined_f1_list.append(avg_f1)
+        # elif type == 'code_':
+        #     code_f1_list.append(avg_f1)
 
-            output_df['idx'] = test_df['idx']
-            output_df['code'] = test_df['code']
-            output_df['ast'] = test_df['ast']
-            output_df['actual label'] = test_df['actual label']
-            output_df['pred'] = pred
+        output_df['actual label'] = test_df['actual label']
+        output_df['pred'] = pred
 
-            output_df.to_csv(f"")
+        # output_df.to_csv(f"")
 
 
     avg_acc = round(sum(acc_list)/len(acc_list), 4)
@@ -148,15 +135,29 @@ for dataset in ['chatgpt_', 'gemini', 'chatgpt4']:
 
     
     print()
-    print(f'=== AVERAGE SCORES :{dataset}===')
+    print('=== AVERAGE SCORES :===')
     print()
     print(f'--> Accuracy: {avg_acc} TPR: {avg_tpr} TNR: {avg_tnr} Human_F1: {avg_human_f1} AI_F1: {avg_ai_f1} F1: {avg_f1}')
     print()
 
-ast_avg_f1 = round(sum(ast_f1_list)/len(ast_f1_list), 4)
-combined_avg_f1 = round(sum(combined_f1_list)/len(combined_f1_list), 4)
-code_avg_f1 = round(sum(code_f1_list)/len(code_f1_list), 4)
-print(f'--> AST F1: {ast_avg_f1} Combined F1: {combined_avg_f1} Code F1: {code_avg_f1}')
-print(f'--> AST F1: {ast_avg_f1}')
+split_data_path = ''
 
-print()
+emb_types = [ 'code_']
+model_type = 'xgb'
+
+with open('../../data/models.file', 'rb') as f:
+    tuned_models = pickle.load(f)
+
+print(f'Model: {model_type}')
+
+test_model()
+# ast_f1_list, combined_f1_list, code_f1_list = [], [], []
+
+
+# ast_avg_f1 = round(sum(ast_f1_list)/len(ast_f1_list), 4)
+# combined_avg_f1 = round(sum(combined_f1_list)/len(combined_f1_list), 4)
+# code_avg_f1 = round(sum(code_f1_list)/len(code_f1_list), 4)
+# print(f'--> AST F1: {ast_avg_f1} Combined F1: {combined_avg_f1} Code F1: {code_avg_f1}')
+# print(f'--> AST F1: {ast_avg_f1}')
+
+# print()
