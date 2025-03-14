@@ -75,6 +75,7 @@ def get_hyperparameters(estimator):
 data_file_path = "../../data/prepared/"
 
 def test_model():
+    output = pd.DataFrame(columns=['idx', 'acc', 'tpr', 'tnr', 'f1', 'learning_rate', 'n_estimators', 'max_depth', 'loss', 'criterion'])
     auroc_list, acc_list, tpr_list, tnr_list, human_f1_list, ai_f1_list, f1_list = [], [], [], [], [], [], []
 
     train_file_name = data_file_path + "train.pkl"
@@ -92,26 +93,32 @@ def test_model():
         y_test = test_df['actual label']
 
         # print(f'Train shape: {X_train.shape}, Test shape: {X_test.shape}')
+        for tuned_clf in tuned_models[type]:
 
-        tuned_clf = tuned_models[type][0]
-        clf = GradientBoostingClassifier()
-        all_params = tuned_clf.get_params(deep=False)
+            # tuned_clf = tuned_models[type][0]
+            clf = MLPClassifier()
+            all_params = tuned_clf.get_params(deep=False)
 
-        clf.set_params(**all_params)
-        clf.fit(X_train, y_train)
-        pred = clf.predict(X_test)
-        acc, tpr, tnr, f1, human_f1, ai_f1 = calculate_metrics(y_test, pred.tolist())
-        avg_f1 = (human_f1+ai_f1)/2
+            clf.set_params(**all_params)
+            clf = clf.fit(X_train, y_train)
+            pred = clf.predict(X_test)
+            acc, tpr, tnr, f1, human_f1, ai_f1 = calculate_metrics(y_test, pred.tolist())
+            avg_f1 = (human_f1+ai_f1)/2
 
-        print(f'Dataset: test, Type: {type}')
-        print(f'--> Accuracy: {round(acc, 4)} TPR: {round(tpr, 4)} TNR: {round(tnr, 4)} Human_F1: {round(human_f1, 4)} AI_F1: {round(ai_f1, 4)} Avg_F1: {round(avg_f1, 4)}')
-
-        acc_list.append(acc)
-        tpr_list.append(tpr)
-        tnr_list.append(tnr)
-        human_f1_list.append(human_f1)
-        ai_f1_list.append(ai_f1)
-        f1_list.append(avg_f1)
+            # learning_rate = all_params['learning_rate']
+            # n_estimators = all_params['n_estimators']
+            # max_depth = all_params['max_depth']
+            # loss = all_params['loss']
+            # criterion = all_params['criterion']
+            # print(f'Dataset: test, Learning Rate: {learning_rate} n_estimator {n_estimators} max depth {max_depth}\nloss: {loss} criterion: {criterion}')
+            print(f'--> Accuracy: {round(acc, 4)} TPR: {round(tpr, 4)} TNR: {round(tnr, 4)} Human_F1: {round(human_f1, 4)} AI_F1: {round(ai_f1, 4)} Avg_F1: {round(avg_f1, 4)}')
+            # output = pd.concat([pd.DataFrame({'idx': 'test', 'acc': acc, 'tpr': tpr, 'tnr': tnr, 'f1': avg_f1, 'learning_rate': learning_rate, 'n_estimators': n_estimators, 'max_depth': max_depth, 'loss': loss, 'criterion': criterion}, index=[0]), output])
+            acc_list.append(acc)
+            tpr_list.append(tpr)
+            tnr_list.append(tnr)
+            human_f1_list.append(human_f1)
+            ai_f1_list.append(ai_f1)
+            f1_list.append(avg_f1)
 
         # if type == 'ast_':
         #     ast_f1_list.append(avg_f1)
@@ -139,18 +146,20 @@ def test_model():
     print()
     print(f'--> Accuracy: {avg_acc} TPR: {avg_tpr} TNR: {avg_tnr} Human_F1: {avg_human_f1} AI_F1: {avg_ai_f1} F1: {avg_f1}')
     print()
+    return output
 
 split_data_path = ''
 
 emb_types = [ 'code_']
 model_type = 'xgb'
 
-with open('../../data/models.file', 'rb') as f:
+with open('../../data/models-nn.file', 'rb') as f:
     tuned_models = pickle.load(f)
 
 print(f'Model: {model_type}')
 
-test_model()
+output = test_model()
+# output.to_csv(f"../../data/test_results.csv")
 # ast_f1_list, combined_f1_list, code_f1_list = [], [], []
 
 
