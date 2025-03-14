@@ -8,9 +8,9 @@ import sys
 import torch
 torch.cuda.empty_cache()
 
-data_input_file =  "../../data/prepared/code.pkl"
+data_input_file =  "../../data/prepared/testCode.pkl"
 
-data_output_file = "../../data/prepared/embeddings.pkl"
+data_output_file = "../../data/prepared/embeddingsTest.pkl"
 
 
 checkpoint = "Salesforce/codet5p-110m-embedding"
@@ -23,35 +23,38 @@ def loadCode(filename: str):
 
 def get_embedding(text, tokenizer, model, chunk_size=512, overlap=50):
     # Tokenize the input text
-    tokens = tokenizer(text, return_tensors='pt', truncation=False, padding=False).to(device)
-    input_ids = tokens['input_ids'][0]
-    
-    # Initialize a list to store embeddings
-    embeddings = []
-    
-    # Process the text in chunks
-    for start_idx in range(0, len(input_ids), chunk_size - overlap):
-        end_idx = start_idx + chunk_size
-        chunk = input_ids[start_idx:end_idx]
-        
-        # If the chunk is smaller than chunk_size, pad it
-        if len(chunk) < chunk_size:
-            padding = torch.zeros(chunk_size - len(chunk), dtype=torch.long, device=device)
-            chunk = torch.cat([chunk, padding])
-        
-        # Get the embedding for the chunk
-        with torch.no_grad():
-            # Pass the chunk through the model
-            output = model(input_ids=chunk.unsqueeze(0))
-            # The output is already the embedding tensor
-            chunk_embedding = output[0]  # Use the first element of the output tuple
-        
-        # Store the embedding
-        embeddings.append(chunk_embedding)
-    
-    # Aggregate the embeddings (e.g., by averaging)
-    aggregated_embedding = torch.mean(torch.stack(embeddings), dim=0).cpu().numpy()
-    
+    try:
+      tokens = tokenizer(text, return_tensors='pt', truncation=False, padding=False).to(device)
+      input_ids = tokens['input_ids'][0]
+      
+      # Initialize a list to store embeddings
+      embeddings = []
+      
+      # Process the text in chunks
+      for start_idx in range(0, len(input_ids), chunk_size - overlap):
+          end_idx = start_idx + chunk_size
+          chunk = input_ids[start_idx:end_idx]
+          
+          # If the chunk is smaller than chunk_size, pad it
+          if len(chunk) < chunk_size:
+              padding = torch.zeros(chunk_size - len(chunk), dtype=torch.long, device=device)
+              chunk = torch.cat([chunk, padding])
+          
+          # Get the embedding for the chunk
+          with torch.no_grad():
+              # Pass the chunk through the model
+              output = model(input_ids=chunk.unsqueeze(0))
+              # The output is already the embedding tensor
+              chunk_embedding = output[0]  # Use the first element of the output tuple
+          
+          # Store the embedding
+          embeddings.append(chunk_embedding)
+      
+      # Aggregate the embeddings (e.g., by averaging)
+      aggregated_embedding = torch.mean(torch.stack(embeddings), dim=0).cpu().numpy()
+    except Exception as e:
+      aggregated_embedding = None
+       
     return aggregated_embedding
 
 def main():
@@ -67,7 +70,7 @@ def main():
   with alive_bar(len(source)) as bar:
     
     for index, row in source.iterrows():
-      embeddings[index] = get_embedding(row['code'], tokenizer, model)
+      embeddings[index] = get_embedding(row['code'], tokenizer, model, 1024)
       bar()
 
   output['code_embeddings'] = embeddings
