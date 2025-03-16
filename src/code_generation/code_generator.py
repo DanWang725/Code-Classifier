@@ -5,10 +5,8 @@ import pandas as pd
 from alive_progress import alive_bar
 import json
 import os
-from ml_utils import data_files_directory
 
-data_files_output_directory = data_files_directory + "ai-code/"
-output_file = "output.csv"
+base_dir = "../../data/ai-code/"
 
 def getCodeFromResponse(content: str):
     matches = re.search(r"```c(.+?)```", content, re.DOTALL)
@@ -52,12 +50,11 @@ def generateCodeFromChatWithRetry(question: str, response: str):
     cleaned_content = (str)(re.sub(r"<think>.*?</think>\n?", "", response.message.content, flags=re.DOTALL))
     return cleaned_content
 
-def generate(source: pd.DataFrame):
-    if(os.path.exists(data_files_output_directory + output_file)): # If the output file exists, load it
-        output = pd.read_csv(data_files_output_directory + output_file)
+def generate(source: pd.DataFrame, data_output_file: str):
+    if(os.path.exists(data_output_file)): # If the output file exists, load it
+        output = pd.read_pickle(data_output_file)
         outputCode = output['code'].tolist()
         label = output['actual label'].tolist()
-        os.rename(data_files_output_directory + output_file, data_files_output_directory + output_file + ".bak")
     else:
         output = source.loc[:, 'identifier'].to_frame()
         outputCode = [None for x in range(len(source))]
@@ -91,8 +88,31 @@ def generate(source: pd.DataFrame):
     output['code'] = outputCode
     output['actual label'] = label
 
-    output.to_csv(data_files_output_directory + output_file, index=False)
+    return output
 
 if __name__ == "__main__":
-    df = pd.read_pickle(data_files_output_directory + "questions.pkl")
-    generate(df)
+    question_files = [x[:-8] for x in os.listdir(base_dir) if x.endswith(".pbm.pkl")]
+    print("Question Files: ")
+    for idx, file in enumerate(question_files):
+        print(f"{idx+1}. {file}")
+    input_file = int(input("Enter the file index to read questions from: "))
+    data_input_file = base_dir + question_files[input_file-1] + ".pbm.pkl"
+
+    code_output_files = [x[:-9] for x in os.listdir(base_dir) if x.endswith(".code.pkl")]
+    print("Enter File to Save To. Existing Files to Overwrite (copy will be temporarily saved): ")
+    for idx, file in enumerate(code_output_files):
+        print(f"{idx+1}. {file}")
+    output_file = input("Filename or Index to Overwrite: ")
+    if(output_file.isnumeric() and int(output_file) <= len(code_output_files)):
+        data_output_file = base_dir + code_output_files[int(output_file)-1] + ".code.pkl"
+        os.system("cp " + data_output_file + " " + data_output_file + ".old")
+    else:
+        data_output_file = base_dir + output_file + ".code.pkl"
+
+    print("="*40)
+    print("Reading from: ", data_input_file)
+    print("Saving to: ", data_output_file)
+
+    df = pd.read_pickle(data_input_file)
+    output = generate(df, data_output_file)
+    output.to_pickle(data_output_file)
