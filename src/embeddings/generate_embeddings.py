@@ -8,9 +8,13 @@ import sys
 import torch
 torch.cuda.empty_cache()
 
-data_input_file =  "../../data/prepared/testCode.pkl"
+base_dir = "../../data/prepared/"
 
-data_output_file = "../../data/prepared/embeddingsTest.pkl"
+# #testCode.pkl
+# data_input_file =  "../../data/prepared/" # .code.pkl
+
+# #embeddings.pkl
+# data_output_file = "../../data/prepared/" #.emb.pkl
 
 
 checkpoint = "Salesforce/codet5p-110m-embedding"
@@ -19,7 +23,6 @@ device = "cuda"  # for GPU usage or "cpu" for CPU usage
 def loadCode(filename: str):
   source = pd.read_pickle(filename)
   return source
-
 
 def get_embedding(text, tokenizer, model, chunk_size=512, overlap=50):
     # Tokenize the input text
@@ -57,12 +60,12 @@ def get_embedding(text, tokenizer, model, chunk_size=512, overlap=50):
        
     return aggregated_embedding
 
-def main():
+def generate(input_file: str):
   tokenizer = AutoTokenizer.from_pretrained(checkpoint, trust_remote_code=True)
   model = AutoModel.from_pretrained(checkpoint, trust_remote_code=True).to(device)
   print("Loaded Model")
 
-  source = loadCode(data_input_file)
+  source = loadCode(input_file)
   print(f"Loaded code. Count: {source.shape}")
   embeddings = source['code'].tolist()
   output = source['actual label'].to_frame()
@@ -74,13 +77,32 @@ def main():
       bar()
 
   output['code_embeddings'] = embeddings
-  output.to_pickle(data_output_file)
-
-
-
-# inputs = tokenizer.encode("def print_hello_world():\tprint('Hello World!')", return_tensors="pt").to(device)
-# embedding = model(inputs)[0]
+  return output
 
 if __name__ == "__main__":
-  print(torch.cuda.is_available())
-  main()
+  print("CUDA is available: ", torch.cuda.is_available())
+  code_files = [x[:-9] for x in os.listdir(base_dir) if x.endswith(".code.pkl")]
+  print("Code Files to Embed: ")
+  for idx, file in enumerate(code_files):
+     print(f"{idx+1}. {file}")
+  input_file = int(input("Enter the file number to embed: "))
+  data_input_file = base_dir + code_files[input_file-1] + ".code.pkl"
+
+  embedding_files = [x[:-8] for x in os.listdir(base_dir) if x.endswith(".emb.pkl")]
+  print("Enter File to Save To. Existing Files to Overwrite (copy will be temporarily saved): ")
+  for idx, file in enumerate(embedding_files):
+     print(f"{idx+1}. {file}")
+  output_file = input("Filename or Index to Overwrite:")
+  if(output_file.isnumeric() and int(output_file) <= len(embedding_files)):
+    data_output_file = base_dir + embedding_files[int(output_file)-1] + ".emb.pkl"
+    os.system("cp " + data_output_file + " " + data_output_file + ".old")
+  else:
+    data_output_file = base_dir + output_file + ".emb.pkl"
+
+  print("="*40)
+  print("Reading from: ", data_input_file)
+  print("Saving to: ", data_output_file)
+
+  output = generate(data_input_file)
+  output.to_pickle(data_output_file)
+  print("Saved to ", data_output_file)
