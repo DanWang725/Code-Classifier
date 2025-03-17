@@ -68,12 +68,12 @@ def generate(input_file: str):
   source = loadCode(input_file)
   print(f"Loaded code. Count: {source.shape}")
   embeddings = source['code'].tolist()
+  print(len(embeddings))
   output = source['actual label'].to_frame()
 
   with alive_bar(len(source)) as bar:
-    
-    for index, row in source.iterrows():
-      embeddings[index] = get_embedding(row['code'], tokenizer, model, 1024)
+    for index, row in enumerate(embeddings):
+      embeddings[index] = get_embedding(row, tokenizer, model, 1024)
       bar()
 
   output['code_embeddings'] = embeddings
