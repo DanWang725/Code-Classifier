@@ -1,0 +1,15 @@
+pandas
+gensim==4.3.3
+scikit-learn
+pycparser
+torch
+torchvision
+torchaudio
+--index-url https://download.pytorch.org/whl/cu126
+ollama
+jupyter
+alive_progress
+tqdm
+pycaret
+transformers
+html-to-markdown
