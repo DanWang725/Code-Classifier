@@ -6,8 +6,9 @@ from alive_progress import alive_bar
 import json
 import os
 import sys
+from utils.file_retrieval import DataFileDirectory
 
-base_dir = "../../data/ai-code/"
+base_dir = "../data/ai-code/"
 
 def getCodeFromResponse(content: str):
     matches = re.search(r"```c\n(.+?)```", content, re.DOTALL)
@@ -25,7 +26,7 @@ def generateCodeFromChat(model: str, question: str):
     },
         {
         'role': 'system',
-        'content': 'Write the C language code for the given coding question'
+        'content': 'Write only C language code for the given coding question'
     }])
     cleaned_content = (str)(re.sub(r"<think>.*?</think>\n?", "", response.message.content, flags=re.DOTALL))
     return cleaned_content
@@ -98,35 +99,39 @@ def generate(source: pd.DataFrame, data_output_file: str, model: str = 'deepseek
     return output
 
 models = ['deepseek-r1:8b', 'deepseek-r1-8b-0t', 'deepseek-r1:14b', 'deepseek-r1-14b-0t']
+output_extension = ".code.pkl"
+input_extension = ".pbl.pkl"
 
 if __name__ == "__main__":
-    question_files = [x[:-8] for x in os.listdir(base_dir) if x.endswith(".pbm.pkl")]
-    print("Question Files: ")
-    for idx, file in enumerate(question_files):
-        print(f"{idx+1}. {file}")
-    input_file = int(input("Enter the file index to read questions from: "))
-    data_input_file = base_dir + question_files[input_file-1] + ".pbm.pkl"
+    file_path = os.path.dirname(os.path.abspath(__file__)) + "/../data/ai-code/"
+    question_files_class = DataFileDirectory(file_path, '.pbm.pkl')
 
-    code_output_files = [x[:-9] for x in os.listdir(base_dir) if x.endswith(".code.pkl")]
-    print("Enter File to Save To. Existing Files to Overwrite (copy will be temporarily saved): ")
-    for idx, file in enumerate(code_output_files):
-        print(f"{idx+1}. {file}")
-    output_file = input("Filename or Index to Overwrite: ")
-    if(output_file.isnumeric() and int(output_file) <= len(code_output_files)):
-        data_output_file = base_dir + code_output_files[int(output_file)-1] + ".code.pkl"
+    file = ""
+    while file is not None:
+        file = question_files_class.get_file("Choose files to generate questions for")
+
+    save_same_name = input("use file names for output? (y/n)")
+    output_map = dict[str, str]
+    if save_same_name == "y":
+        output_map = {(x + input_extension): x + output_extension for x in question_files_class.get_chosen_files(prefix_path=True)}
     else:
-        data_output_file = base_dir + output_file + ".code.pkl"
+        output_map = {file_path + x + input_extension : x for x in question_files_class.get_chosen_files()}
+        for filePath, fileName in output_map.items():
+            print(f"Enter the new name for {fileName}")
+            newFileName = input()
+            output_map[filePath] = file_path + newFileName + output_extension
 
     for idx, model in enumerate(models):
         print(f"{idx+1}. {model}")
     model_input = int(input("Enter the model index to use: "))
     model = models[model_input-1]
 
-    print("="*40)
-    print("Reading from: ", data_input_file)
-    print("Saving to: ", data_output_file)
-    print("Using model: ", model)
+    for data_input_file, data_output_file in output_map.items():
+        print("="*40)
+        print("Reading from: ", data_input_file)
+        print("Saving to: ", data_output_file)
+        print("Using model: ", model)
 
-    df = pd.read_pickle(data_input_file)
-    output = generate(df, data_output_file, model)
-    output.to_pickle(data_output_file)
+        df = pd.read_pickle(data_input_file)
+        output = generate(df, data_output_file, model)
+        output.to_pickle(data_output_file)
