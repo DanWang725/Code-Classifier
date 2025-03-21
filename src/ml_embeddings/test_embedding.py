@@ -72,14 +72,12 @@ def get_hyperparameters(estimator):
         hyperparameters[key] = value
     return hyperparameters
 
-data_file_path = "../../data/prepared/"
+base_dir = "../../data/prepared/"
+model_dir = "../../data/models/"
 
-def test_model():
+def test_model(train_file_name, test_file_name):
     output = pd.DataFrame(columns=['idx', 'acc', 'tpr', 'tnr', 'f1', 'learning_rate', 'n_estimators', 'max_depth', 'loss', 'criterion'])
     auroc_list, acc_list, tpr_list, tnr_list, human_f1_list, ai_f1_list, f1_list = [], [], [], [], [], [], []
-
-    train_file_name = data_file_path + "train.pkl"
-    test_file_name = data_file_path + "test.pkl"
 
     train_df = pd.read_pickle(train_file_name)
     test_df = pd.read_pickle(test_file_name)
@@ -96,7 +94,7 @@ def test_model():
         for tuned_clf in tuned_models[type]:
 
             # tuned_clf = tuned_models[type][0]
-            clf = MLPClassifier()
+            clf = GradientBoostingClassifier()
             all_params = tuned_clf.get_params(deep=False)
 
             clf.set_params(**all_params)
@@ -119,6 +117,14 @@ def test_model():
             human_f1_list.append(human_f1)
             ai_f1_list.append(ai_f1)
             f1_list.append(avg_f1)
+        
+        clf = MLPClassifier()
+        clf = clf.fit(X_train, y_train)
+        pred = clf.predict(X_test)
+        acc, tpr, tnr, f1, human_f1, ai_f1 = calculate_metrics(y_test, pred.tolist())
+        avg_f1 = (human_f1+ai_f1)/2
+        print(f'--> Accuracy: {round(acc, 4)} TPR: {round(tpr, 4)} TNR: {round(tnr, 4)} Human_F1: {round(human_f1, 4)} AI_F1: {round(ai_f1, 4)} Avg_F1: {round(avg_f1, 4)}')
+
 
         # if type == 'ast_':
         #     ast_f1_list.append(avg_f1)
@@ -153,12 +159,33 @@ split_data_path = ''
 emb_types = [ 'code_']
 model_type = 'xgb'
 
-with open('../../data/models-nn.file', 'rb') as f:
+with open('../../data/models-codenet-2.file', 'rb') as f:
     tuned_models = pickle.load(f)
 
-print(f'Model: {model_type}')
+if __name__ =="__main__":
+    embedding_files = [x[:-8] for x in os.listdir(base_dir) if x.endswith(".emb.pkl")]
+    model_files = [x[:-5] for x in os.listdir(model_dir) if x.endswith(".file")]
 
-output = test_model()
+    print("Found embedding datasets: ")
+    for idx, file in enumerate(embedding_files):
+        print(f"{idx+1}. {file}")
+    train_file = int(input("File number to load as training: "))
+    test_file = int(input("File number to load as testing: "))
+
+    train_file_name = base_dir + embedding_files[train_file-1] + ".emb.pkl"
+    test_file_name = base_dir + embedding_files[test_file-1] + ".emb.pkl"
+
+    print("Found existing models: ")
+    for idx, file in enumerate(model_files):
+        print(f"{idx+1}. {file}")
+    model_to_load = int(input("File number to load as model: "))
+    
+    os.system('cls||clear')
+    tuned_models = pickle.load(open(model_dir + model_files[model_to_load-1] + ".file", 'rb'))
+    
+    print(f'Train File: {train_file_name} Test File: {test_file_name}\nModel File: {model_files[model_to_load-1]}')
+    output = test_model(train_file_name, test_file_name)
+
 # output.to_csv(f"../../data/test_results.csv")
 # ast_f1_list, combined_f1_list, code_f1_list = [], [], []
 
