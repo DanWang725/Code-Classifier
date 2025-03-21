@@ -7,7 +7,7 @@ import re
 import pandas as pd
 from alive_progress import alive_bar
 from tqdm import tqdm
-from ml_utils import data_files_directory, dataset_files_directory
+from src.utils.directories import data_files_directory, dataset_files_directory
 
 question_generation_prompt = """You will be given c langauge code from a file. Your job will be to generate a first-year university computer science course assignment question that the student would have written the code for.
 

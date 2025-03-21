@@ -20,7 +20,7 @@ from scipy import stats
 from tqdm import tqdm
 import os
 import warnings
-from embedding import expand_embeddings
+from src.utils.embedding import expand_embeddings
 
 warnings.filterwarnings('ignore')
 

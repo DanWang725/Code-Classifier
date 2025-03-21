@@ -6,16 +6,10 @@ from tqdm import tqdm
 from alive_progress import alive_bar
 import sys
 import torch
+from utils.directories import prepared_dir
+from utils.file_retrieval import DataFileDirectory
+from utils.file_utils import prompt_save_file
 torch.cuda.empty_cache()
-
-base_dir = "../../data/prepared/"
-
-# #testCode.pkl
-# data_input_file =  "../../data/prepared/" # .code.pkl
-
-# #embeddings.pkl
-# data_output_file = "../../data/prepared/" #.emb.pkl
-
 
 checkpoint = "Salesforce/codet5p-110m-embedding"
 device = "cuda"  # for GPU usage or "cpu" for CPU usage
@@ -80,24 +74,12 @@ def generate(input_file: str):
   return output
 
 if __name__ == "__main__":
-  print("CUDA is available: ", torch.cuda.is_available())
-  code_files = [x[:-9] for x in os.listdir(base_dir) if x.endswith(".code.pkl")]
-  print("Code Files to Embed: ")
-  for idx, file in enumerate(code_files):
-     print(f"{idx+1}. {file}")
-  input_file = int(input("Enter the file number to embed: "))
-  data_input_file = base_dir + code_files[input_file-1] + ".code.pkl"
+  file_path = os.path.dirname(os.path.abspath(__file__)) + "/" + prepared_dir
+  question_files_class = DataFileDirectory(file_path, '.code.pkl')
+  data_input_file = question_files_class.get_file("Select file to embed")
 
-  embedding_files = [x[:-8] for x in os.listdir(base_dir) if x.endswith(".emb.pkl")]
-  print("Enter File to Save To. Existing Files to Overwrite (copy will be temporarily saved): ")
-  for idx, file in enumerate(embedding_files):
-     print(f"{idx+1}. {file}")
-  output_file = input("Filename or Index to Overwrite:")
-  if(output_file.isnumeric() and int(output_file) <= len(embedding_files)):
-    data_output_file = base_dir + embedding_files[int(output_file)-1] + ".emb.pkl"
-    os.system("cp " + data_output_file + " " + data_output_file + ".old")
-  else:
-    data_output_file = base_dir + output_file + ".emb.pkl"
+  output_map = prompt_save_file(question_files_class, '.emb.pkl')
+  data_output_file = output_map[data_input_file]
 
   print("="*40)
   print("Reading from: ", data_input_file)

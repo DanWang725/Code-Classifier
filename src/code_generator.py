@@ -7,6 +7,7 @@ import json
 import os
 import sys
 from utils.file_retrieval import DataFileDirectory
+from utils.file_utils import prompt_save_file
 
 base_dir = "../data/ai-code/"
 
@@ -108,18 +109,9 @@ if __name__ == "__main__":
 
     file = ""
     while file is not None:
-        file = question_files_class.get_file("Choose files to generate questions for")
+        file = question_files_class.get_file("Choose files to generate questions for, exit to continue. ")
 
-    save_same_name = input("use file names for output? (y/n)")
-    output_map = dict[str, str]
-    if save_same_name == "y":
-        output_map = {(x + input_extension): x + output_extension for x in question_files_class.get_chosen_files(prefix_path=True)}
-    else:
-        output_map = {file_path + x + input_extension : x for x in question_files_class.get_chosen_files()}
-        for filePath, fileName in output_map.items():
-            print(f"Enter the new name for {fileName}")
-            newFileName = input()
-            output_map[filePath] = file_path + newFileName + output_extension
+    output_map = prompt_save_file(question_files_class, output_extension, False)
 
     for idx, model in enumerate(models):
         print(f"{idx+1}. {model}")

@@ -12,7 +12,7 @@ from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier
 from sklearn.ensemble import VotingClassifier, BaggingClassifier, GradientBoostingClassifier
 from sklearn.neural_network import MLPClassifier
 import pickle
-from embedding import prepare_data
+from src.utils.embedding import prepare_data
 from alive_progress import alive_bar
 
 def get_processed_params():
