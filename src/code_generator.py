@@ -8,8 +8,7 @@ import os
 import sys
 from utils.file_retrieval import DataFileDirectory
 from utils.file_utils import prompt_save_file
-
-base_dir = "../data/ai-code/"
+from utils.directories import ai_dir
 
 def getCodeFromResponse(content: str):
     matches = re.search(r"```c\n(.+?)```", content, re.DOTALL)
@@ -104,7 +103,7 @@ output_extension = ".code.pkl"
 input_extension = ".pbl.pkl"
 
 if __name__ == "__main__":
-    file_path = os.path.dirname(os.path.abspath(__file__)) + "/../data/ai-code/"
+    file_path = os.path.dirname(os.path.abspath(__file__)) + "/" + ai_dir
     question_files_class = DataFileDirectory(file_path, '.pbm.pkl')
 
     file = ""

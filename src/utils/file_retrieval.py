@@ -46,7 +46,7 @@ class DataFileDirectory:
   def get_file(self, message: str) -> str | None:
     chosen_file = ""
     while chosen_file == "":
-      print(message + " type 'help' for settings, 'exit' to exit.")
+      print(message + "Enter the number or file name.\ntype 'help' for settings, 'exit' to exit.")
       print(f"Settings | start: {self.settings['start']} | end {self.settings['end']} | contains {self.settings['contains']}")
       valid_files = self._get_selectable_files()
       for idx, file in enumerate(valid_files):
@@ -61,6 +61,9 @@ class DataFileDirectory:
         self.chosen_files[valid_files[int(choice)]] = True
       elif choice == "exit":
         chosen_file = None
+      elif choice in valid_files:
+        chosen_file = self.data_path + choice + self.data_ext
+        self.chosen_files[choice] = True
       else:
         print("invalid input")
     return chosen_file
