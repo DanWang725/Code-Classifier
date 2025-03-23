@@ -1,4 +1,5 @@
 import re
+from time import sleep
 from ollama import chat
 from ollama import ChatResponse
 import pandas as pd
@@ -9,6 +10,18 @@ import sys
 from utils.file_retrieval import DataFileDirectory
 from utils.file_utils import prompt_save_file
 from utils.directories import ai_dir
+from utils.rate_limit import rate_limits
+
+from dotenv import load_dotenv
+from google import genai
+
+load_dotenv()
+
+api_key = os.getenv("GOOGLE_AI")
+print(api_key)
+
+
+client = genai.Client(api_key=api_key)
 
 def getCodeFromResponse(content: str):
     matches = re.search(r"```c\n(.+?)```", content, re.DOTALL)
@@ -17,18 +30,48 @@ def getCodeFromResponse(content: str):
     else:
         return None
     
+@rate_limits(max_calls=10, period=60)
+def generateCodeFromGemini(model: str, content: str):
+    response = client.models.generate_content(model=model, contents=content)
+    return response.text
 
 def generateCodeFromChat(model: str, question: str):
-    response = chat(model=model, messages=[ #14b
-    {
-        'role': 'user',
-        'content': question,
-    },
-        {
-        'role': 'system',
-        'content': 'Write only C language code for the given coding question'
-    }])
-    cleaned_content = (str)(re.sub(r"<think>.*?</think>\n?", "", response.message.content, flags=re.DOTALL))
+    if(model == 'llama3.1'):
+        messages = [
+                    {
+                        'role': 'system',
+                        'content': 'Write only C language code for the given coding question'
+                    },
+                    {
+                        'role': 'user',
+                        'content': question,
+                    }
+                    ]
+    elif model == "gemini-2.0-flash":
+        messages = "Write only C language code for the given coding question:\n" + question
+    else:
+        messages = [
+                    {
+                        'role': 'user',
+                        'content': question,
+                    },
+                        {
+                        'role': 'system',
+                        'content': 'Write only C language code for the given coding question'
+                    }]
+        
+    if(model == "gemini-2.0-flash"):
+        try:
+            text_content = generateCodeFromGemini(model, messages)
+        except Exception as e:
+            print(e)
+            sleep(60)
+            text_content = generateCodeFromGemini(model, messages)
+    else:
+        response = chat(model=model, messages=messages)
+        text_content = response.messages.content
+
+    cleaned_content = (str)(re.sub(r"<think>.*?</think>\n?", "", text_content, flags=re.DOTALL))
     return cleaned_content
 
 def generateCodeFromChatWithRetry(question: str, response: str):
@@ -98,25 +141,11 @@ def generate(source: pd.DataFrame, data_output_file: str, model: str = 'deepseek
 
     return output
 
-models = ['deepseek-r1:8b', 'deepseek-r1-8b-0t', 'deepseek-r1:14b', 'deepseek-r1-14b-0t']
+models = ['deepseek-r1:8b', 'deepseek-r1-8b-0t', 'deepseek-r1:14b', 'deepseek-r1-14b-0t', 'llama3.1', 'gemini-2.0-flash']
 output_extension = ".code.pkl"
 input_extension = ".pbl.pkl"
 
-if __name__ == "__main__":
-    file_path = os.path.dirname(os.path.abspath(__file__)) + "/" + ai_dir
-    question_files_class = DataFileDirectory(file_path, '.pbm.pkl')
-
-    file = ""
-    while file is not None:
-        file = question_files_class.get_file("Choose files to generate questions for, exit to continue. ")
-
-    output_map = prompt_save_file(question_files_class, output_extension, False)
-
-    for idx, model in enumerate(models):
-        print(f"{idx+1}. {model}")
-    model_input = int(input("Enter the model index to use: "))
-    model = models[model_input-1]
-
+def generation_loop(output_map: dict[str,str], model):
     for data_input_file, data_output_file in output_map.items():
         print("="*40)
         print("Reading from: ", data_input_file)
@@ -126,3 +155,25 @@ if __name__ == "__main__":
         df = pd.read_pickle(data_input_file)
         output = generate(df, data_output_file, model)
         output.to_pickle(data_output_file)
+
+if __name__ == "__main__":
+    file_path = os.path.dirname(os.path.abspath(__file__)) + "/" + ai_dir
+    question_files_class = DataFileDirectory(file_path, '.pbm.pkl')
+
+    file = ""
+    while file is not None:
+        file = question_files_class.get_file("Choose files to generate questions for, exit to continue. ")
+
+    output_map, multiple = prompt_save_file(question_files_class, output_extension, False, True)
+
+    for idx, model in enumerate(models):
+        print(f"{idx+1}. {model}")
+    model_input = int(input("Enter the model index to use: "))
+    model = models[model_input-1]
+
+    if (multiple):
+        for file_map in output_map:
+            generation_loop(file_map, model)
+    else:
+        generation_loop(output_map=output_map, model=model)
+

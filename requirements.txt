@@ -13,3 +13,4 @@ tqdm
 pycaret
 transformers
 html-to-markdown
+google-genai

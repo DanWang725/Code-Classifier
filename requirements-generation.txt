@@ -1,3 +1,4 @@
 pandas
 ollama
 alive_progress
+google-genai
