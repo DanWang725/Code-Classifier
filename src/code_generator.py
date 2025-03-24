@@ -69,7 +69,7 @@ def generateCodeFromChat(model: str, question: str):
             text_content = generateCodeFromGemini(model, messages)
     else:
         response = chat(model=model, messages=messages)
-        text_content = response.messages.content
+        text_content = response.message.content
 
     cleaned_content = (str)(re.sub(r"<think>.*?</think>\n?", "", text_content, flags=re.DOTALL))
     return cleaned_content
