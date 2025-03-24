@@ -1,53 +1,49 @@
 import pandas as pd
 import os
 import sys
-
-base_dir = "../../data/"
-ai_code_dir = base_dir + "ai-code/"
-human_code_dir = base_dir + "human-written/"
-output_code_dir = base_dir + "prepared/"
+from utils.directories import prepared_dir, ai_dir, human_dir
+from utils.file_retrieval import DataFileDirectory
 
 prompt = "Merging data interface. First select data source: \n1 = AI code\n2 = Human code\nd = Finish\n"
 
 if __name__ == "__main__":
-  ai_files = [x[:-9] for x in os.listdir(ai_code_dir) if x.endswith(".code.pkl")]
-  human_files = [x[:-9] for x in os.listdir(human_code_dir) if x.endswith(".code.pkl")]
-
-  added_files = []
-  human_dir = pd.DataFrame(columns=['identifier','code', 'actual label'])
-  ai_dir = pd.DataFrame(columns=['identifier','code', 'actual label'])
+  ai_path = os.path.dirname(os.path.abspath(__file__)) + "/" + ai_dir
+  human_path = os.path.dirname(os.path.abspath(__file__)) + "/" + human_dir
+  ai_files = DataFileDirectory(ai_path, '.code.pkl')
+  human_files = DataFileDirectory(human_path, '.code.pkl')
 
   user_input = input(prompt)
   while user_input != "d":
     if user_input == "1":
+      selected_dir = ai_files
       files_choice = ai_files
-      file_dir = ai_code_dir
+      file_dir = ai_dir
     elif user_input == "2":
+      selected_dir = human_files
       files_choice = human_files
-      file_dir = human_code_dir
+      file_dir = human_dir
     elif user_input == "d":
       break
     else:
       print("Invalid choice. Please try again.")
-  
-    for idx, file in enumerate(files_choice):
-      print(f"{idx+1}. {file}")
-    input_file = int(input("Enter the file number to merge in: "))
 
-    added_files.append(files_choice[input_file-1])
-
-    data_input_file = file_dir + "/" + files_choice[input_file-1] + ".code.pkl"
-    data = pd.read_pickle(data_input_file)
-    if file_dir == ai_code_dir:
-      ai_dir = pd.concat([ai_dir, data], ignore_index=True)
-    else:
-      human_dir = pd.concat([human_dir, data], ignore_index=True)
-    
-    print("Data currently added: ", added_files)
+    selected_dir.get_file("Select Files to Choose")
     user_input = input(prompt)
 
-  human_df = human_dir["code"].copy()
-  ai_df = ai_dir["code"].copy()
+  
+  human_build_df = pd.DataFrame(columns=['identifier','code', 'actual label'])
+  ai_build_df = pd.DataFrame(columns=['identifier','code', 'actual label'])
+
+  for file in ai_files.get_chosen_files(prefix_path=True, extension=True):
+    data = pd.read_pickle(file)
+    ai_build_df = pd.concat([ai_build_df, data], ignore_index=True)
+
+  for file in human_files.get_chosen_files(prefix_path=True, extension=True):
+    data = pd.read_pickle(file)
+    human_build_df = pd.concat([human_build_df, data], ignore_index=True)      
+
+  human_df = human_build_df["code"].copy()
+  ai_df = ai_build_df["code"].copy()
 
   human_df.columns = ['code']
   ai_df.columns = ['code']
@@ -60,17 +56,17 @@ if __name__ == "__main__":
 
   merged_df = pd.concat([human_df, ai_df], ignore_index=True).dropna()
   
-  output_files = [x[:-9] for x in os.listdir(output_code_dir) if x.endswith(".code.pkl")]
+  output_files = [x[:-9] for x in os.listdir(prepared_dir) if x.endswith(".code.pkl")]
 
   print("Enter File to Save To. Existing Files to Overwrite (copy will be temporarily saved): ")
   for idx, file in enumerate(output_files):
       print(f"{idx+1}. {file}")
   output_file = input("Filename or Index to Overwrite: ")
   if(output_file.isnumeric() and int(output_file) <= len(output_files)):
-      data_output_file = output_code_dir + output_files[int(output_file)-1] + ".code.pkl"
+      data_output_file = prepared_dir + output_files[int(output_file)-1] + ".code.pkl"
       os.system("cp " + data_output_file + " " + data_output_file + ".old")
   else:
-      data_output_file = output_code_dir + output_file + ".code.pkl"
+      data_output_file = prepared_dir + output_file + ".code.pkl"
   # Save the merged data
   merged_df.to_pickle(data_output_file)
   print("Data merged and saved successfully.")

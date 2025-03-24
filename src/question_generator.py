@@ -39,7 +39,7 @@ def retrieveResponse(prompt: str, question: str):
             'content': question,
         }
     ])
-    # sys.stderr.write(response.message.content)
+    sys.stderr.write(response.message.content)
     cleaned_content = (str)(re.sub(r"<think>.*?</think>\n?", "", response.message.content, flags=re.DOTALL))
     return cleaned_content 
 

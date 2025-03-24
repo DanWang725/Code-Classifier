@@ -78,7 +78,7 @@ if __name__ == "__main__":
   question_files_class = DataFileDirectory(file_path, '.code.pkl')
   data_input_file = question_files_class.get_file("Select file to embed")
 
-  output_map = prompt_save_file(question_files_class, '.emb.pkl')
+  output_map, multiple = prompt_save_file(question_files_class, '.emb.pkl')
   data_output_file = output_map[data_input_file]
 
   print("="*40)
