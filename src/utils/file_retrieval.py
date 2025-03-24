@@ -1,4 +1,5 @@
 import os
+import sys
 class DataFileDirectory:
   files: list[str]
   chosen_files: dict[str, bool]
@@ -42,17 +43,22 @@ class DataFileDirectory:
             (self.settings['start'] is None or x.startswith(self.settings['start'])) and
             (self.settings['end'] is None or x.endswith(self.settings['end'])) and
             (self.settings['contains'] is None or x.startswith(self.settings['contains']))]
+  def _get_selected_files(self) -> list[str]:
+    return [x for x in self.chosen_files if self.chosen_files[x] is True]
 
   def get_file(self, message: str) -> str | None:
     chosen_file = ""
     while chosen_file == "":
-      print(message + "Enter the number or file name.\ntype 'help' for settings, 'exit' to exit.")
-      print(f"Settings | start: {self.settings['start']} | end {self.settings['end']} | contains {self.settings['contains']}")
       valid_files = self._get_selectable_files()
-      for idx, file in enumerate(valid_files):
-        print(f"{idx}. {file}")
+      print(str(self._get_selected_files()))
+      if(sys.stdout.isatty()):  
+        print(message + "Enter the number or file name.\ntype 'help' for settings, 'exit' to exit.")
+        print(f"Settings | start: {self.settings['start']} | end {self.settings['end']} | contains {self.settings['contains']}")
+        for idx, file in enumerate(valid_files):
+          print(f"{idx}. {file}")
+
       choice = input()
-      if(choice == "help"):
+      if(choice == "help"): 
         self.set_settings()
         continue
       
@@ -61,6 +67,10 @@ class DataFileDirectory:
         self.chosen_files[valid_files[int(choice)]] = True
       elif choice == "exit":
         chosen_file = None
+      elif choice == "-a":
+        chosen_file = valid_files[0]
+        for valid_file in valid_files:
+          self.chosen_files[valid_file] = True
       elif choice in valid_files:
         chosen_file = self.data_path + choice + self.data_ext
         self.chosen_files[choice] = True
@@ -71,3 +81,6 @@ class DataFileDirectory:
   def get_chosen_files(self, prefix_path: bool = False, extension: bool = False) -> list[str]:
     base = [(self.data_path if prefix_path else '') + x + (self.data_ext if extension else '') for x in self.chosen_files if self.chosen_files[x] is True]
     return base
+  
+  def get_path_to_file_name_mapping(self):
+    return {(self.data_path + x + self.data_ext): x for x in self.files if self.chosen_files[x] is True}
