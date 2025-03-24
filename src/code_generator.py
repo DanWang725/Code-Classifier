@@ -20,8 +20,8 @@ load_dotenv()
 api_key = os.getenv("GOOGLE_AI")
 print(api_key)
 
-
-client = genai.Client(api_key=api_key)
+if(api_key is not None):
+    client = genai.Client(api_key=api_key)
 
 def getCodeFromResponse(content: str):
     matches = re.search(r"```c\n(.+?)```", content, re.DOTALL)
@@ -72,27 +72,6 @@ def generateCodeFromChat(model: str, question: str):
         text_content = response.messages.content
 
     cleaned_content = (str)(re.sub(r"<think>.*?</think>\n?", "", text_content, flags=re.DOTALL))
-    return cleaned_content
-
-def generateCodeFromChatWithRetry(question: str, response: str):
-    response = chat(model='deepseek-r1-8b-0t', messages=[ #14b
-    {
-        'role': 'system',
-        'content': 'Write the C code for the following assignment question'
-    },
-    {
-        'role': 'user',
-        'content': question,
-    },
-    {
-        'role': 'system',
-        'content': response,
-    },
-    {
-        'role': 'user',
-        'content': "I couldn't find the C code from your last response. Here's the assignment question again, please generate C language code to solve this assignment question." + question + ""
-    }])
-    cleaned_content = (str)(re.sub(r"<think>.*?</think>\n?", "", response.message.content, flags=re.DOTALL))
     return cleaned_content
 
 def generate(source: pd.DataFrame, data_output_file: str, model: str = 'deepseek-r1:8b'):
