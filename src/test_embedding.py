@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+from transformers import AutoModel, AutoTokenizer
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 from sklearn.model_selection import KFold, train_test_split
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix
@@ -20,9 +21,11 @@ from scipy import stats
 from tqdm import tqdm
 import os
 import warnings
-from utils.embedding import expand_embeddings
+from utils.embedding import expand_embeddings, ENCODERS
 from utils.file_retrieval import DataFileDirectory
-from utils.directories import prepared_dir, models_dir
+from utils.file_utils import get_emb_stats, EMBEDDING_EXTENSION
+from utils.directories import prepared_dir, models_dir, bin_dir
+from utils.embeddings_gen import embed_files, embed_files_codebert
 
 warnings.filterwarnings('ignore')
 
@@ -97,13 +100,30 @@ def fit_models(model_data, train_path):
     final_models['NeuralNetwork'] = nn
     return final_models
 
+def test_model_df(final_models: dict, test_df: pd.DataFrame, names: list[str]):
+    df_stats = get_emb_stats(test_df)
+    print(f'files: [{df_stats}] ===================')
+
+    X_test = expand_embeddings(test_df, 'code_embeddings')
+    y_test = test_df['actual label']
+
+    # print(f'Train shape: {X_train.shape}, Test shape: {X_test.shape}')
+    for label, model in final_models.items():
+        pred = model.predict(X_test)
+        acc, tpr, tnr, f1, human_f1, ai_f1 = calculate_metrics(y_test, pred.tolist())
+        avg_f1 = (human_f1+ai_f1)/2
+
+        print(f'{label}--> Accuracy: {round(acc, 4)} TPR: {round(tpr, 4)} TNR: {round(tnr, 4)} Human_F1: {round(human_f1, 4)} AI_F1: {round(ai_f1, 4)} Avg_F1: {round(avg_f1, 4)}')
+        # for index, prediction in enumerate(pred.tolist()):
+        #     print(f"{names[index]}: {prediction}")
+
+
 def test_model(final_models: dict, test_files: dict[str, str]):
     output = pd.DataFrame(columns=['idx', 'acc', 'tpr', 'tnr', 'f1', 'learning_rate', 'n_estimators', 'max_depth', 'loss', 'criterion'])
     auroc_list, acc_list, tpr_list, tnr_list, human_f1_list, ai_f1_list, f1_list = [], [], [], [], [], [], []
     for file_path, file_name  in test_files.items():
         print(f'{file_name} ===================')
         test_df = pd.read_pickle(file_path)
-
         output_df = pd.DataFrame(columns=['idx', 'code', 'ast', 'actual label', 'pred'])
 
         X_test = expand_embeddings(test_df, 'code_embeddings')
@@ -163,15 +183,11 @@ if __name__ =="__main__":
     file_path = os.path.dirname(os.path.abspath(__file__)) + "/" + prepared_dir
     model_path = os.path.dirname(os.path.abspath(__file__)) + "/" + models_dir
 
-    file_loader = DataFileDirectory(file_path, '.emb.pkl')
-    test_file_loader = DataFileDirectory(file_path, '.emb.pkl')
+    file_loader = DataFileDirectory(file_path, EMBEDDING_EXTENSION,  stat_func=get_emb_stats)
+    test_file_loader = DataFileDirectory(file_path, EMBEDDING_EXTENSION, stat_func=get_emb_stats)
     model_loader = DataFileDirectory(model_path, '.file')
 
     train_file_name = file_loader.get_file('Select a file to load for training')
-    
-    test_file_name = test_file_loader.get_file('Select a file for testing')
-    while(test_file_name is not None):
-        test_file_name = test_file_loader.get_file('Select other datasets to load, exit to continue to next step.')
 
     model_to_load = model_loader.get_file('Select Model to Load')
 
@@ -179,8 +195,37 @@ if __name__ =="__main__":
     print(f'Train File: {train_file_name} \nModel File: {model_to_load}')
     print('Fitting Classifiers')
     final_models = fit_models(tuned_models, train_file_name)
-    
-    output = test_model(final_models, test_file_loader.get_path_to_file_name_mapping())
+
+    custom = input("custom dataset? (y/n)")
+
+    if(custom != "y"):
+        test_file_name = test_file_loader.get_file('Select a file for testing')
+        while(test_file_name is not None):
+            test_file_name = test_file_loader.get_file('Select other datasets to load, exit to continue to next step. ')
+        
+        output = test_model(final_models, test_file_loader.get_path_to_file_name_mapping())
+    else:
+        c_loader = DataFileDirectory(os.path.dirname(os.path.abspath(__file__)) + "/" + bin_dir, '.c')
+        file = c_loader.get_file('choose some C files to load. ')
+        while(file is not None):
+            file = c_loader.get_file('choose some C files to load. ')
+        
+        device = "cuda"  # for GPU usage or "cpu" for CPU usage
+
+        for index, model in enumerate(ENCODERS):
+            print(f"{index}: {model}")
+        choice = int(input("Choose Encoder"))
+        chosen_encoder = ENCODERS[choice]
+
+        tokenizer = AutoTokenizer.from_pretrained(chosen_encoder, trust_remote_code=True)
+        model = AutoModel.from_pretrained(chosen_encoder, trust_remote_code=True).to(device)
+        if chosen_encoder == ENCODERS[0]:
+            output = embed_files_codebert(c_loader, tokenizer, model)
+        else:
+            output = embed_files(c_loader, tokenizer, model)
+
+        test_model_df(final_models, output, c_loader.get_chosen_files())
+
 
 # output.to_csv(f"../../data/test_results.csv")
 # ast_f1_list, combined_f1_list, code_f1_list = [], [], []

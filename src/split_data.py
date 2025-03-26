@@ -2,12 +2,13 @@ import pandas as pd
 import os
 from utils.directories import prepared_dir
 from utils.file_retrieval import DataFileDirectory
+from utils.file_utils import EMBEDDING_EXTENSION
 
 ratios = [80, 10, 10]
 
 if __name__ == "__main__":
    file_path = os.path.dirname(os.path.abspath(__file__)) + "/" + prepared_dir
-   question_files_class = DataFileDirectory(file_path, '.emb.pkl')
+   question_files_class = DataFileDirectory(file_path, EMBEDDING_EXTENSION)
    data_input_file = question_files_class.get_file("Select file to split")
 
    output_file = input("Enter the file name to save the split data to: ")

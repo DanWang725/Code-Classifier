@@ -16,6 +16,7 @@ from utils.embedding import prepare_data
 from alive_progress import alive_bar
 from utils.file_retrieval import DataFileDirectory
 from utils.directories import models_dir, prepared_dir
+from utils.file_utils import get_emb_stats, EMBEDDING_EXTENSION
 
 def get_processed_params():
     params = [["learning_rate", [1.0, 0.5, 0.1]], [ "n_estimators", [25, 50, 100, 150, 200, 400]], ["loss", ['log_loss', 'exponential']], ["criterion", ['friedman_mse', 'squared_error']]]
@@ -45,7 +46,7 @@ i = 0
 if __name__ == "__main__":
     file_path = os.path.dirname(os.path.abspath(__file__)) + "/" + prepared_dir
     model_dir = os.path.dirname(os.path.abspath(__file__)) + "/" + models_dir
-    data = DataFileDirectory(file_path, '.emb.pkl')
+    data = DataFileDirectory(file_path, EMBEDDING_EXTENSION, get_emb_stats)
 
     train_file_name = data.get_file("Select file to use as training")
 

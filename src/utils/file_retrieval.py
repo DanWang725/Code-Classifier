@@ -1,5 +1,7 @@
 import os
 import sys
+import pandas as pd
+import re
 class DataFileDirectory:
   files: list[str]
   chosen_files: dict[str, bool]
@@ -7,9 +9,17 @@ class DataFileDirectory:
   data_ext: str
   settings: dict[str, str]
   
-  def __init__(self, data_dir: str, extension: str):
+  def __init__(self, data_dir: str, extension: str, stat_func = None):
     self.files = [x[:-len(extension)] for x in os.listdir(data_dir) if x.endswith(extension)]
     self.chosen_files = {x: False for x in self.files}
+    if stat_func is not None:
+      self.stats = {}
+      for file in self.files:
+        contents = pd.read_pickle(data_dir + file + extension)
+        self.stats[file] = "\t"+stat_func(contents)
+    else:
+      self.stats = None
+
     self.data_path = data_dir
     self.data_ext = extension
     self.settings = {
@@ -39,10 +49,11 @@ class DataFileDirectory:
 
   def _get_selectable_files(self) -> list[str]:
     return [x for x in self.chosen_files if 
-            self.chosen_files[x] is False and
-            (self.settings['start'] is None or x.startswith(self.settings['start'])) and
-            (self.settings['end'] is None or x.endswith(self.settings['end'])) and
-            (self.settings['contains'] is None or x.startswith(self.settings['contains']))]
+      self.chosen_files[x] is False and
+      (self.settings['start'] is None or re.match(self.settings['start'], x)) and
+      (self.settings['end'] is None or re.search(self.settings['end'] + r'$', x)) and
+      (self.settings['contains'] is None or x.startswith(self.settings['contains']))]
+  
   def _get_selected_files(self) -> list[str]:
     return [x for x in self.chosen_files if self.chosen_files[x] is True]
 
@@ -55,7 +66,7 @@ class DataFileDirectory:
         print(message + "Enter the number or file name.\ntype 'help' for settings, 'exit' to exit.")
         print(f"Settings | start: {self.settings['start']} | end {self.settings['end']} | contains {self.settings['contains']}")
         for idx, file in enumerate(valid_files):
-          print(f"{idx}. {file}")
+          print(f"{idx}. {(self.stats[file] if self.stats is not None else '')} - {file}")
 
       choice = input()
       if(choice == "help"): 
