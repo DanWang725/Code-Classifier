@@ -6,12 +6,14 @@ import sys
 import re
 import pandas as pd
 from alive_progress import alive_bar
-from tqdm import tqdm
-from src.utils.directories import data_files_directory, dataset_files_directory
+from utils.directories import ai_dir, human_dir
+from utils.embedding import insert_df
+from utils.file_retrieval import DataFileDirectory
+from utils.file_utils import prompt_save_file
+from utils.model_llm import generateFromGemini
 
-question_generation_prompt = """You will be given c langauge code from a file. Your job will be to generate a first-year university computer science course assignment question that the student would have written the code for.
-
-Write the assignment question in clear English formatted into paragraphs, providing clear learning outcomes, and code requirements."""
+question_generation_prompt = """Generate a first-year university computer science course assignment that the student would have written the following code for.
+Write the assignment question in the language was given formatted into paragraphs, providing clear learning outcomes and code requirements."""
 
 english_enforce = """Always respond in English, regardless of the language the user speaks."""
 question_verification_prompt = "Verify that the following assignment question compares to one seen in a first year computer science course, and is written in only English, not including any variable or function names. Write either 'ANSWERYES' or 'ANSWERNO'. Verify the following text:"
@@ -70,19 +72,14 @@ def retrieveEnglishRetry(prompt: str, question: str, response: str):
   cleaned_content = (str)(re.sub(r"<think>.*?</think>\n?", "", response.message.content, flags=re.DOTALL))
   return cleaned_content
 
-def insert_df(df: pd.DataFrame, row: list): 
-  df.loc[-1] = row
-  df.index = df.index + 1  # shifting index
-  df = df.sort_index()  # sorting by index
-  return df
 
 def open_pickle(file_path: str, columns: list):
     if(os.path.exists(file_path)):
       source = pd.read_pickle(file_path)
-      os.rename(file_path, file_path + ".bak")
       return source
     else:
       return pd.DataFrame(columns=columns)
+
 
 def load_question(file_path: str, questions: pd.DataFrame, bar: any):
   questionIdentifier = re.search(r'([A-Z]\d-[A-Z]\d-\d+)', file_path)[1]
@@ -137,21 +134,45 @@ def load_question(file_path: str, questions: pd.DataFrame, bar: any):
   return questions
 
 if __name__ == '__main__':
-  if(len(sys.argv) != 2):
-    print("Usage: python data_grabber.py <code_dir>")
-    sys.exit(1)
-  code_dir = sys.argv[1]
-  files = os.listdir(code_dir)
-  print(f"Reading {len(files)} files from {code_dir}")
-  sleep(5)
-  questions = open_pickle(data_files_directory + "ai-code/questions.pkl", ["question", "identifier"])
+  file_path = os.path.dirname(os.path.abspath(__file__)) + "/" + human_dir
 
-  with alive_bar(len(files), dual_line=True) as bar:
-    for file in files:
+  loader = DataFileDirectory(file_path, '.code.pkl')
+  file_path = loader.get_file('Choose the code file to generate questions from. ')
+  output_map, _ = prompt_save_file(file_loader=loader, output_ext='.pbm.pkl', backup=True, no_directory=True)
+  print(output_map)
+  file_output_path = ai_dir + output_map[file_path]
+
+  output = open_pickle(file_output_path, ["question", "identifier"])
+  code = pd.read_pickle(file_path)
+
+  
+  nProblems = int(input("How many questions per code problem? "))
+  regexIdentifier = input("Enter the identifier to identify the code problem: ") #"(Z\d-Z\d)-\d+"
+
+  identifier_count = {}
+
+  with alive_bar(len(code), dual_line=True) as bar:
+    for index, row in code.iterrows():
+      identifier = re.match(regexIdentifier, row['id'], re.DOTALL).groups()[0]
+      bar.text(row['id'])
+      if (identifier in identifier_count and identifier_count[identifier] >= nProblems):
+        bar()
+        continue
+
+      identifier_count[identifier] = (identifier_count[identifier] if identifier in identifier_count else 0) + 1
+
+      if output.loc[output['identifier'] == row['id']].shape[0] > 0:
+        print(row['id'] + " is already generated")
+        bar()
+        continue
       try:
-        questions = load_question(code_dir + file, questions, bar)
+        generated = generateFromGemini(question_generation_prompt + "\n```\n" + row['code'] + "\n```")
       except Exception as e:
-        sys.stderr.write("Error processing file: " + file + "\n")
+        bar.text(e)
+        sleep(60)
+        generated = generateFromGemini(question_generation_prompt + "\n```\n" + row['code'] + "\n```")
+      print(generated[:100])
+      output = insert_df(output, [generated, row['id']])
       bar()
 
-  questions.to_pickle("questions.pkl")
+  output.to_pickle(file_output_path)
