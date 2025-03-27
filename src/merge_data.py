@@ -3,14 +3,17 @@ import os
 import sys
 from utils.directories import prepared_dir, ai_dir, human_dir
 from utils.file_retrieval import DataFileDirectory
+from utils.file_utils import get_code_stats, get_human_code_stats
 
 prompt = "Merging data interface. First select data source: \n1 = AI code\n2 = Human code\nd = Finish\n"
 
 if __name__ == "__main__":
   ai_path = os.path.dirname(os.path.abspath(__file__)) + "/" + ai_dir
   human_path = os.path.dirname(os.path.abspath(__file__)) + "/" + human_dir
-  ai_files = DataFileDirectory(ai_path, '.code.pkl')
-  human_files = DataFileDirectory(human_path, '.code.pkl')
+
+  print("Loading data...")
+  ai_files = DataFileDirectory(ai_path, '.code.pkl', get_code_stats)
+  human_files = DataFileDirectory(human_path, '.code.pkl', get_human_code_stats)
 
   user_input = input(prompt)
   while user_input != "d":

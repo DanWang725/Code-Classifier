@@ -10,7 +10,7 @@ from utils.directories import ai_dir, human_dir
 from utils.embedding import insert_df
 from utils.file_retrieval import DataFileDirectory
 from utils.file_utils import prompt_save_file
-from utils.model_llm import generateFromGemini
+from utils.model_llm import generateFromGemini, llamaChat
 
 question_generation_prompt = """Generate a first-year university computer science course assignment that the student would have written the following code for.
 Write the assignment question in the language was given formatted into paragraphs, providing clear learning outcomes and code requirements."""
@@ -163,15 +163,18 @@ if __name__ == '__main__':
 
       if output.loc[output['identifier'] == row['id']].shape[0] > 0:
         print(row['id'] + " is already generated")
-        bar()
-        continue
+        print(output.loc[output['identifier'] == row['id']]['question'])
+        res = llamaChat(output.loc[output['identifier'] == row['id']]['question'].values()[0] + "\n Is this code? 'YES' if it is code, 'NO' if it is not")
+        print(res)
+        if(res != "YES"):
+          bar()
+          continue
       try:
         generated = generateFromGemini(question_generation_prompt + "\n```\n" + row['code'] + "\n```")
       except Exception as e:
         bar.text(e)
         sleep(60)
         generated = generateFromGemini(question_generation_prompt + "\n```\n" + row['code'] + "\n```")
-      print(generated[:100])
       output = insert_df(output, [generated, row['id']])
       bar()
 

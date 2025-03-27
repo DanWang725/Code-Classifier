@@ -51,10 +51,11 @@ def get_label_stats(source: pd.DataFrame, col_label: str, labels: list[str]):
   try:
     return {label: len(source.loc[(source[col_label] == label)][col_label].tolist()) for label in labels}
   except Exception as e:
-    print(e)
-    print(source)
-    raise e
-
+    print('wrong label: ' + col_label)
+    if(col_label == 'label'):
+      col_label = 'actual label'
+      return {label: len(source.loc[(source[col_label] == label)][col_label].tolist()) for label in labels}
+    return e
 def get_emb_stats(source: pd.DataFrame):
   stats = get_label_stats(source, "actual label", ['llm', 'human'])
   return f"[Human: {stats['human']}, AI: {stats['llm']}]"

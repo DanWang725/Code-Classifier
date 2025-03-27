@@ -122,9 +122,10 @@ def test_model(final_models: dict, test_files: dict[str, str]):
     output = pd.DataFrame(columns=['idx', 'acc', 'tpr', 'tnr', 'f1', 'learning_rate', 'n_estimators', 'max_depth', 'loss', 'criterion'])
     auroc_list, acc_list, tpr_list, tnr_list, human_f1_list, ai_f1_list, f1_list = [], [], [], [], [], [], []
     for file_path, file_name  in test_files.items():
-        print(f'{file_name} ===================')
         test_df = pd.read_pickle(file_path)
         output_df = pd.DataFrame(columns=['idx', 'code', 'ast', 'actual label', 'pred'])
+        file_stats = get_emb_stats(test_df)
+        print(f'{file_name} [{file_stats}] ===================')
 
         X_test = expand_embeddings(test_df, 'code_embeddings')
         y_test = test_df['actual label']
@@ -183,7 +184,7 @@ if __name__ =="__main__":
     file_path = os.path.dirname(os.path.abspath(__file__)) + "/" + prepared_dir
     model_path = os.path.dirname(os.path.abspath(__file__)) + "/" + models_dir
 
-    file_loader = DataFileDirectory(file_path, EMBEDDING_EXTENSION,  stat_func=get_emb_stats)
+    file_loader = DataFileDirectory(file_path, ".train" + EMBEDDING_EXTENSION,  stat_func=get_emb_stats)
     test_file_loader = DataFileDirectory(file_path, EMBEDDING_EXTENSION, stat_func=get_emb_stats)
     model_loader = DataFileDirectory(model_path, '.file')
 
@@ -203,6 +204,7 @@ if __name__ =="__main__":
         while(test_file_name is not None):
             test_file_name = test_file_loader.get_file('Select other datasets to load, exit to continue to next step. ')
         
+        print('Classifier:' + model_loader.get_path_to_file_name_mapping()[model_to_load])
         output = test_model(final_models, test_file_loader.get_path_to_file_name_mapping())
     else:
         c_loader = DataFileDirectory(os.path.dirname(os.path.abspath(__file__)) + "/" + bin_dir, '.c')

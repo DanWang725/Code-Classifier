@@ -36,6 +36,10 @@ def generateFromGemini(content: str, model: str = "gemini-2.0-flash"):
         print("FAILURE:", content)
     return response.text
 
+def llamaChat(question:str):
+    response = chat(model='llama3.1', messages=[{'role': 'user', 'content': question}])
+    return response.message.content
+
 def generateCodeFromChat(model: str, question: str):
     if(model == 'llama3.1'):
         messages = [
