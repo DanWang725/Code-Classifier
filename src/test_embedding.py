@@ -21,10 +21,10 @@ from scipy import stats
 from tqdm import tqdm
 import os
 import warnings
-from utils.embedding import expand_embeddings, ENCODERS
+from utils.embedding import expand_embeddings, ENCODERS, EncoderMap
 from utils.file_retrieval import DataFileDirectory
 from utils.file_utils import get_emb_stats, EMBEDDING_EXTENSION
-from utils.directories import prepared_dir, models_dir, bin_dir
+from utils.directories import prepared_dir, models_dir, bin_dir, stats_dir
 from utils.embeddings_gen import embed_files, embed_files_codebert
 
 warnings.filterwarnings('ignore')
@@ -77,18 +77,18 @@ def get_hyperparameters(estimator):
         hyperparameters[key] = value
     return hyperparameters
 
-def fit_models(model_data, train_path):
+def fit_models(train_file_path: str, tuned_models: dict):
     final_models = {}
 
-    train_df = pd.read_pickle(train_path)
+    train_df = pd.read_pickle(train_file_path)
     X_train = expand_embeddings(train_df, 'code_embeddings')
     y_train = train_df['actual label']
 
-    tuned_clf = model_data['code_'][0]
+    tuned_clf = tuned_models
 
     #gradient boosting classifier
     clf = GradientBoostingClassifier()
-    all_params = tuned_clf.get_params(deep=False)
+    all_params = tuned_clf['GradientBoosted'].get_params(deep=False)
 
     clf.set_params(**all_params)
     clf = clf.fit(X_train, y_train)
@@ -96,6 +96,8 @@ def fit_models(model_data, train_path):
 
     #nn
     nn = MLPClassifier()
+    all_params_nn = tuned_clf['NeuralNetwork'].get_params(deep=False)
+    nn.set_params(**all_params_nn)
     nn = nn.fit(X_train, y_train)
     final_models['NeuralNetwork'] = nn
     return final_models
@@ -110,20 +112,32 @@ def test_model_df(final_models: dict, test_df: pd.DataFrame, names: list[str]):
     # print(f'Train shape: {X_train.shape}, Test shape: {X_test.shape}')
     for label, model in final_models.items():
         pred = model.predict(X_test)
-        acc, tpr, tnr, f1, human_f1, ai_f1 = calculate_metrics(y_test, pred.tolist())
-        avg_f1 = (human_f1+ai_f1)/2
+        try:
+            acc, tpr, tnr, f1, human_f1, ai_f1 = calculate_metrics(y_test, pred.tolist())
+            avg_f1 = (human_f1+ai_f1)/2
+            print(f'{label}--> Accuracy: {round(acc, 4)} TPR: {round(tpr, 4)} TNR: {round(tnr, 4)} Human_F1: {round(human_f1, 4)} AI_F1: {round(ai_f1, 4)} Avg_F1: {round(avg_f1, 4)}')
+        except Exception as e:
+            print(':(', e)
+            print(pred)
 
-        print(f'{label}--> Accuracy: {round(acc, 4)} TPR: {round(tpr, 4)} TNR: {round(tnr, 4)} Human_F1: {round(human_f1, 4)} AI_F1: {round(ai_f1, 4)} Avg_F1: {round(avg_f1, 4)}')
-        # for index, prediction in enumerate(pred.tolist()):
-        #     print(f"{names[index]}: {prediction}")
+def determine_llm_from_path(path: str) -> str:
+    if 'gemini' in path:
+        return 'Gemini'
+    elif 'deepseek' in path:
+        return 'deepseek'
+    else:
+        return 'unknown'
+    
+def determine_dataset_from_path(path: str) -> str:
+    if 'codenet' in path:
+        return 'codenet'
+    elif 'vl' in path:
+        return 'vl'
 
-
-def test_model(final_models: dict, test_files: dict[str, str]):
-    output = pd.DataFrame(columns=['idx', 'acc', 'tpr', 'tnr', 'f1', 'learning_rate', 'n_estimators', 'max_depth', 'loss', 'criterion'])
+def test_model(final_models: dict, test_files: dict[str, str], data_package: dict, output_df: pd.DataFrame) -> pd.DataFrame:
     auroc_list, acc_list, tpr_list, tnr_list, human_f1_list, ai_f1_list, f1_list = [], [], [], [], [], [], []
     for file_path, file_name  in test_files.items():
         test_df = pd.read_pickle(file_path)
-        output_df = pd.DataFrame(columns=['idx', 'code', 'ast', 'actual label', 'pred'])
         file_stats = get_emb_stats(test_df)
         print(f'{file_name} [{file_stats}] ===================')
 
@@ -136,28 +150,15 @@ def test_model(final_models: dict, test_files: dict[str, str]):
             acc, tpr, tnr, f1, human_f1, ai_f1 = calculate_metrics(y_test, pred.tolist())
             avg_f1 = (human_f1+ai_f1)/2
 
-            print(f'{label}--> Accuracy: {round(acc, 4)} TPR: {round(tpr, 4)} TNR: {round(tnr, 4)} Human_F1: {round(human_f1, 4)} AI_F1: {round(ai_f1, 4)} Avg_F1: {round(avg_f1, 4)}')
-            # output = pd.concat([pd.DataFrame({'idx': 'test', 'acc': acc, 'tpr': tpr, 'tnr': tnr, 'f1': avg_f1, 'learning_rate': learning_rate, 'n_estimators': n_estimators, 'max_depth': max_depth, 'loss': loss, 'criterion': criterion}, index=[0]), output])
+            print(f'\t{label}-->\tAccuracy: {round(acc, 4)} \tTPR: {round(tpr, 4)}\tTNR: {round(tnr, 4)}\tHuman_F1: {round(human_f1, 4)}\tAI_F1: {round(ai_f1, 4)}\tAvg_F1: {round(avg_f1, 4)}')
+            output_df = pd.concat([output_df, pd.DataFrame([[determine_dataset_from_path(file_name), determine_llm_from_path(file_name), data_package['embedding'], f"{determine_dataset_from_path(data_package['train_file'])}-{determine_llm_from_path(data_package['train_file'])}", label, test_df.shape[0], acc, tpr, tnr, avg_f1]], columns=output.columns)], ignore_index=True)
             acc_list.append(acc)
             tpr_list.append(tpr)
             tnr_list.append(tnr)
             human_f1_list.append(human_f1)
             ai_f1_list.append(ai_f1)
             f1_list.append(avg_f1)
-        
 
-
-            # if type == 'ast_':
-            #     ast_f1_list.append(avg_f1)
-            # elif type == 'combined_':
-            #     combined_f1_list.append(avg_f1)
-            # elif type == 'code_':
-            #     code_f1_list.append(avg_f1)
-
-            output_df['actual label'] = test_df['actual label']
-            output_df['pred'] = pred
-
-            # output_df.to_csv(f"")
 
 
     avg_acc = round(sum(acc_list)/len(acc_list), 4)
@@ -173,39 +174,52 @@ def test_model(final_models: dict, test_files: dict[str, str]):
     print()
     print(f'--> Accuracy: {avg_acc} TPR: {avg_tpr} TNR: {avg_tnr} Human_F1: {avg_human_f1} AI_F1: {avg_ai_f1} F1: {avg_f1}')
     print()
-    return output
-
-split_data_path = ''
-
-emb_types = [ 'code_']
-model_type = 'xgb'
+    return output_df
 
 if __name__ =="__main__":
     file_path = os.path.dirname(os.path.abspath(__file__)) + "/" + prepared_dir
     model_path = os.path.dirname(os.path.abspath(__file__)) + "/" + models_dir
+    stats_path = os.path.dirname(os.path.abspath(__file__)) + "/" + stats_dir
 
-    file_loader = DataFileDirectory(file_path, ".train" + EMBEDDING_EXTENSION,  stat_func=get_emb_stats)
-    test_file_loader = DataFileDirectory(file_path, EMBEDDING_EXTENSION, stat_func=get_emb_stats)
-    model_loader = DataFileDirectory(model_path, '.file')
-
-    train_file_name = file_loader.get_file('Select a file to load for training')
-
+    model_loader = DataFileDirectory(model_path, '.model')
     model_to_load = model_loader.get_file('Select Model to Load')
+    initial_data_package = pickle.load(open(model_to_load, 'rb'))
 
-    tuned_models = pickle.load(open(model_to_load, 'rb'))
-    print(f'Train File: {train_file_name} \nModel File: {model_to_load}')
-    print('Fitting Classifiers')
-    final_models = fit_models(tuned_models, train_file_name)
+    chosen_encoder = initial_data_package['embedding']
+    print(f'Imported Model: {model_loader.get_path_to_file_name_mapping()[model_to_load]}')
+
+    while(model_to_load is not None):
+        model_to_load = model_loader.get_file('Select another Model to Load, exit to continue.', contains=chosen_encoder)
 
     custom = input("custom dataset? (y/n)")
 
     if(custom != "y"):
+        test_file_loader = DataFileDirectory(file_path, EMBEDDING_EXTENSION, stat_func=get_emb_stats, contains=chosen_encoder, ends_with='.test')
         test_file_name = test_file_loader.get_file('Select a file for testing')
         while(test_file_name is not None):
             test_file_name = test_file_loader.get_file('Select other datasets to load, exit to continue to next step. ')
         
-        print('Classifier:' + model_loader.get_path_to_file_name_mapping()[model_to_load])
-        output = test_model(final_models, test_file_loader.get_path_to_file_name_mapping())
+        output = pd.DataFrame(columns=['dataset', 'llm', 'embedding', 'classifier', 'model', 'total predictions', 'acc', 'tpr', 'tnr', 'f1'])
+
+        for model_path in model_loader.get_chosen_files(prefix_path=True, extension=True):
+            data_package = pickle.load(open(model_path, 'rb'))
+            print(f'Train File: {data_package["train_file"]} \nModel File: {model_path}')
+            print('Fitting Classifiers')
+            final_models = fit_models(file_path + data_package['train_file'], data_package['models'])
+
+            print('Classifier:' + model_loader.get_path_to_file_name_mapping()[model_path])
+            output = test_model(final_models, test_file_loader.get_path_to_file_name_mapping(), data_package, output)
+        statistic_file_name = input("Enter file name to save statistics to: ")
+        statistic_file_path = stats_dir + statistic_file_name + ".csv"
+
+        if os.path.exists(statistic_file_path):
+            print(f"File {statistic_file_name}.csv exists. Loading existing data...")
+            existing_data = pd.read_csv(statistic_file_path, index_col=0)
+            output = pd.concat([existing_data, output])
+            print("Existing data concatenated with new data.")
+
+        output.to_csv(statistic_file_path)
+        print(f"Statistics saved to {statistic_file_name}.csv")
     else:
         c_loader = DataFileDirectory(os.path.dirname(os.path.abspath(__file__)) + "/" + bin_dir, '.c')
         file = c_loader.get_file('choose some C files to load. ')
@@ -213,11 +227,8 @@ if __name__ =="__main__":
             file = c_loader.get_file('choose some C files to load. ')
         
         device = "cuda"  # for GPU usage or "cpu" for CPU usage
-
-        for index, model in enumerate(ENCODERS):
-            print(f"{index}: {model}")
-        choice = int(input("Choose Encoder"))
-        chosen_encoder = ENCODERS[choice]
+        ivd = {v: k for k, v in EncoderMap.items()}
+        chosen_encoder = ivd[data_package['embedding']]
 
         tokenizer = AutoTokenizer.from_pretrained(chosen_encoder, trust_remote_code=True)
         model = AutoModel.from_pretrained(chosen_encoder, trust_remote_code=True).to(device)
