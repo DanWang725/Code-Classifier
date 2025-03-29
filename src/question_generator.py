@@ -147,7 +147,13 @@ if __name__ == '__main__':
 
   
   nProblems = int(input("How many questions per code problem? "))
-  regexIdentifier = input("Enter the identifier to identify the code problem: ") #"(Z\d-Z\d)-\d+"
+  # regexIdentifier = input("Enter the identifier to identify the code problem: ") #"(Z\d-Z\d)-\d+"
+  regexIdentifier = "(Z\d-Z\d)-\d+"
+  regenerate = []
+  response = input(f"enter identifiers to regenerate: {regenerate}: ")
+  while response != 'end':
+    regenerate.append(response)
+    response = input(f"enter identifiers to regenerate: {regenerate}: ")
 
   identifier_count = {}
 
@@ -162,20 +168,24 @@ if __name__ == '__main__':
       identifier_count[identifier] = (identifier_count[identifier] if identifier in identifier_count else 0) + 1
 
       if output.loc[output['identifier'] == row['id']].shape[0] > 0:
-        print(row['id'] + " is already generated")
-        print(output.loc[output['identifier'] == row['id']]['question'])
-        res = llamaChat(output.loc[output['identifier'] == row['id']]['question'].values()[0] + "\n Is this code? 'YES' if it is code, 'NO' if it is not")
-        print(res)
-        if(res != "YES"):
+        if(row['id'] not in regenerate):
+          print(f"{row['id']} already generated.")
           bar()
           continue
+        print(f"{row['id']} already generated. Regenerating...")
+      
       try:
+        bar.text(f"Generating {row['id']}")
         generated = generateFromGemini(question_generation_prompt + "\n```\n" + row['code'] + "\n```")
       except Exception as e:
         bar.text(e)
         sleep(60)
         generated = generateFromGemini(question_generation_prompt + "\n```\n" + row['code'] + "\n```")
-      output = insert_df(output, [generated, row['id']])
+      
+      if output.loc[output['identifier'] == row['id']].shape[0] > 0:
+        output.loc[output['identifier'] == row['id'], 'question'] = generated
+      else:  
+        output = insert_df(output, [generated, row['id']])
       bar()
 
   output.to_pickle(file_output_path)
