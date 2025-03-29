@@ -56,6 +56,14 @@ def get_label_stats(source: pd.DataFrame, col_label: str, labels: list[str]):
       col_label = 'actual label'
       return {label: len(source.loc[(source[col_label] == label)][col_label].tolist()) for label in labels}
     return e
+  
+def get_col_stats(source: pd.DataFrame, col_label: str):
+  try: 
+    return len(source[col_label].tolist())
+  except Exception as e:
+    print(e)
+    return 1
+  
 def get_emb_stats(source: pd.DataFrame):
   stats = get_label_stats(source, "actual label", ['llm', 'human'])
   return f"[Human: {stats['human']}, AI: {stats['llm']}]"
@@ -67,3 +75,7 @@ def get_code_stats(source: pd.DataFrame):
 def get_human_code_stats(source: pd.DataFrame):
   stats = get_label_stats(source, "label", ['ai', 'human', 'ai-failed'])
   return f"[H: {stats['human']}, AI: {stats['ai']}, f(AI): {stats['ai-failed']}]"
+
+def get_question_stats(source: pd.DataFrame):
+  stats = get_col_stats(source, "question")
+  return f"[Questions: {stats}]"

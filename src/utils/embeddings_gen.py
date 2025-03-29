@@ -17,8 +17,25 @@ def get_embedding_roBERTa(text, tokenizer, model):
       print(e)
       return None
 
+def get_embedding_starcoder(text, tokenizer, model):
+  try:
+    inputs = tokenizer(text, return_tensors="pt", truncation=True, padding=True, max_length=1024).to(device)
+    with torch.no_grad():
+      outputs = model(**inputs)
+    embedding = outputs.last_hidden_state.mean(dim=1).squeeze(0)
+    return embedding.cpu().numpy()
+  except Exception as e:
+    print(e)
+    return None
+
 def get_embedding(text, tokenizer, model, chunk_size=512, overlap=50):
-    # Tokenize the input text
+    inputs = tokenizer(text, return_tensors="pt", truncation=True, padding=True, max_length=512).to(device)
+    with torch.no_grad():
+      embedding = model(**inputs)[0]
+    
+    return embedding.cpu().numpy()
+    #old code
+    #Tokenize the input text
     try:
       tokens = tokenizer(text, return_tensors='pt', truncation=False, padding=False).to(device)
       input_ids = tokens['input_ids'][0]

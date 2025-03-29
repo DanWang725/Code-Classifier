@@ -9,7 +9,7 @@ class DataFileDirectory:
   data_ext: str
   settings: dict[str, str]
   
-  def __init__(self, data_dir: str, extension: str, stat_func = None):
+  def __init__(self, data_dir: str, extension: str, stat_func = None, contains: str = None, starts_with: str = None, ends_with: str = None):
     self.files = [x[:-len(extension)] for x in os.listdir(data_dir) if x.endswith(extension)]
     self.chosen_files = {x: False for x in self.files}
     if stat_func is not None:
@@ -23,9 +23,9 @@ class DataFileDirectory:
     self.data_path = data_dir
     self.data_ext = extension
     self.settings = {
-      "start": None,
-      "end": None,
-      "contains": None,
+      "start": starts_with,
+      "end": ends_with,
+      "contains": contains,
     }
   
 
@@ -52,12 +52,14 @@ class DataFileDirectory:
       self.chosen_files[x] is False and
       (self.settings['start'] is None or re.match(self.settings['start'], x)) and
       (self.settings['end'] is None or re.search(self.settings['end'] + r'$', x)) and
-      (self.settings['contains'] is None or x.startswith(self.settings['contains']))]
+      (self.settings['contains'] is None or x.find(self.settings['contains']) != -1)]
   
   def _get_selected_files(self) -> list[str]:
     return [x for x in self.chosen_files if self.chosen_files[x] is True]
 
-  def get_file(self, message: str) -> str | None:
+  def get_file(self, message: str, contains: str = None) -> str | None:
+    if contains is not None:
+      self.settings['contains'] = contains
     chosen_file = ""
     while chosen_file == "":
       valid_files = self._get_selectable_files()

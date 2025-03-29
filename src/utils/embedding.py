@@ -1,6 +1,7 @@
 import pandas as pd
 
 ENCODERS = ["neulab/codebert-c", "Salesforce/codet5p-110m-embedding"]
+EncoderMap = {ENCODERS[0]: 'codebert', ENCODERS[1]: 'codet5p'}
 
 def prepare_data(source: pd.DataFrame, embedding_label: str, target: str):
   data_expanded = expand_embeddings(source, embedding_label)
