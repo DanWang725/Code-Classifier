@@ -1,0 +1,10 @@
+codenet-deepseek-p1-nochunk-codet5p.train
+codenet-gemini-p1-codet5p.train
+vl-gemini-lang-nochunk-codet5p.train
+exit
+n
+codenet-deepseek-p1-nochunk-codet5p.test1
+codenet-gemini-1-nochunk-codet5p.test
+vl-gemini-lang-nochunk-codet5p.test
+exit
+score-2-mar-28

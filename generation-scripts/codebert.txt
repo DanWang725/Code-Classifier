@@ -1,0 +1,10 @@
+codenet-deepseek-p1-codebert.train
+codenet-gemini-p1-codebert.train
+vl-gemini-codebert-lang.train
+exit
+n
+codenet-deepseek-p1-codebert.test
+codenet-gemini-p1-codebert.test
+vl-gemini-codebert-lang.test
+exit
+score-2-mar-28
