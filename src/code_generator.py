@@ -8,7 +8,7 @@ import json
 import os
 import sys
 from utils.file_retrieval import DataFileDirectory
-from utils.file_utils import prompt_save_file
+from utils.file_utils import prompt_save_file, get_question_stats
 from utils.directories import ai_dir
 from utils.model_llm import generateCodeFromChat, getCodeFromResponse, models
 
@@ -76,7 +76,7 @@ def generation_loop(output_map: dict[str,str], model):
 
 if __name__ == "__main__":
     file_path = os.path.dirname(os.path.abspath(__file__)) + "/" + ai_dir
-    question_files_class = DataFileDirectory(file_path, '.pbm.pkl')
+    question_files_class = DataFileDirectory(file_path, '.pbm.pkl', get_question_stats)
 
     file = ""
     while file is not None:
