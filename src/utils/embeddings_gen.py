@@ -6,9 +6,9 @@ from utils.embedding import insert_df
 
 device="cuda"
 
-def get_embedding_roBERTa(text, tokenizer, model):
+def get_embedding_roBERTa(text, tokenizer, model, chunk_size=512):
     try:
-      inputs = tokenizer(text, return_tensors="pt", truncation=True, padding=True, max_length=512).to(device)
+      inputs = tokenizer(text, return_tensors="pt", truncation=True, padding=True, max_length=chunk_size).to(device)
       with torch.no_grad():
         output = model(**inputs)
       embedding = output.last_hidden_state[:, 0, :].squeeze(0)
@@ -19,7 +19,7 @@ def get_embedding_roBERTa(text, tokenizer, model):
 
 def get_embedding_starcoder(text, tokenizer, model):
   try:
-    inputs = tokenizer(text, return_tensors="pt", truncation=True, padding=True, max_length=1024).to(device)
+    inputs = tokenizer(text, return_tensors="pt", truncation=True, padding=True, max_length=8192).to(device)
     with torch.no_grad():
       outputs = model(**inputs)
     embedding = outputs.last_hidden_state.mean(dim=1).squeeze(0)
@@ -28,8 +28,8 @@ def get_embedding_starcoder(text, tokenizer, model):
     print(e)
     return None
 
-def get_embedding(text, tokenizer, model, chunk_size=512, overlap=50):
-    inputs = tokenizer(text, return_tensors="pt", truncation=True, padding=True, max_length=512).to(device)
+def get_embedding(text, tokenizer, model, chunk_size=512):
+    inputs = tokenizer(text, return_tensors="pt", truncation=True, padding=True, max_length=chunk_size).to(device)
     with torch.no_grad():
       embedding = model(**inputs)[0]
     

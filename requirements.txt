@@ -1,7 +1,4 @@
-pandas
-gensim==4.3.3
 scikit-learn
-pycparser
 torch
 torchvision
 torchaudio
@@ -11,6 +8,10 @@ jupyter
 alive_progress
 tqdm
 pycaret
+pandas==2.1.4
+numpy==1.24.4
 transformers
 html-to-markdown
 google-genai
+accelerate>=0.26.0
+clipboard==0.0.4

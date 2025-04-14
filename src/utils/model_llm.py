@@ -15,6 +15,7 @@ from google import genai
 
 models = ['deepseek-r1:8b', 'deepseek-r1-8b-0t', 'deepseek-r1:14b', 'deepseek-r1-14b-0t', 'llama3.1', 'gemini-2.0-flash']
 
+generationPrompt = "Write only C language code for the given coding question:\n"
 load_dotenv()
 
 api_key = os.getenv("GOOGLE_AI")
@@ -53,7 +54,7 @@ def generateCodeFromChat(model: str, question: str):
                     }
                     ]
     elif model == "gemini-2.0-flash":
-        messages = "Write only C language code for the given coding question:\n" + question
+        messages = generationPrompt + question
     else:
         messages = [
                     {

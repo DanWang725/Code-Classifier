@@ -46,9 +46,12 @@ i = 0
 if __name__ == "__main__":
     file_path = os.path.dirname(os.path.abspath(__file__)) + "/" + prepared_dir
     model_dir = os.path.dirname(os.path.abspath(__file__)) + "/" + models_dir
-    data_loader = DataFileDirectory(file_path, EMBEDDING_EXTENSION, get_emb_stats, ends_with='.train')
+    data_loader = DataFileDirectory(file_path, EMBEDDING_EXTENSION, get_emb_stats, {'end': '.train'})
 
     train_file_path = data_loader.get_file("Select file to use as training")
+    file = ''
+    while(file is not None):
+        file = data_loader.get_file('Select file to use as training')
 
     print("What is the encoding??")
     for index, label in enumerate(EncoderMap.values()):
@@ -56,36 +59,41 @@ if __name__ == "__main__":
 
     embedder = EncoderMap[ENCODERS[int(input())]]
 
-    data = pd.read_pickle(train_file_path)
+    for index, train_file in enumerate(data_loader.get_chosen_files(prefix_path=True, extension=True)):
+        print(f"Loading {train_file}")
+        data = pd.read_pickle(train_file)
 
-    filtered_data = prepare_data(data, 'code_embeddings', 'actual label')
+        filtered_data = prepare_data(data, 'code_embeddings', 'actual label')
 
-    reg1 = setup(data = filtered_data, target = 'actual label', index=False, session_id=42)
+        reg1 = setup(data = filtered_data, target = 'actual label', index=False, session_id=42)
 
-    models = {'NeuralNetwork': MLPClassifier(), 'GradientBoosted': GradientBoostingClassifier()}
+        models = {'NeuralNetwork': MLPClassifier(hidden_layer_sizes=(filtered_data.shape[0] - 1,)), 'GradientBoosted': GradientBoostingClassifier(ccp_alpha=0.001)}
+        # models = {'NeuralNetwork': MLPClassifier(), 'GradientBoosted': GradientBoostingClassifier()}
 
-    data_package = {'embedding': embedder, 'train_file': data_loader.get_chosen_files(extension=True)[0], 'models': {}}
-    print(data_package)
+        data_package = {'embedding': embedder, 'train_file': data_loader.get_chosen_files(extension=True)[index], 'models': {}}
+        print(data_package)
 
-    with alive_bar(len(models.items())) as bar:
-        for model_name, model in models.items():
-            tuned_model = tune_model(model, verbose=False)
-            data_package['models'][model_name] = tuned_model
-            bar()
+        with alive_bar(len(models.items())) as bar:
+            for model_name, model in models.items():
+                tuned_model = tune_model(model, verbose=False)
+                data_package['models'][model_name] = tuned_model
+                bar()
 
-    model_files = [x[:-5] for x in os.listdir(model_dir) if x.endswith(".model")]
+        data_output_file = model_dir + data_loader.get_chosen_files()[index] + ".model"
 
-    print("Found existing models: ")
-    for idx, file in enumerate(model_files):
-        print(f"{idx+1}. {file}")
-    train_file = input("File number to load as training, or enter 'y' to use train file name: ")
-    if(train_file.isnumeric() and int(train_file) <= len(model_files)):
-        data_output_file = model_dir + model_files[int(train_file)-1] + ".model"
-    else:
-        if(train_file == 'y'):
-            data_output_file = model_dir + data_loader.get_chosen_files()[0] + '.model'
-        else:
-            data_output_file = model_dir + train_file + ".model"
+        # model_files = [x[:-6] for x in os.listdir(model_dir) if x.endswith(".model")]
 
-    with open(data_output_file, 'wb') as f:
-        pickle.dump(data_package, f)
+    # print("Found existing models: ")
+    # for idx, file in enumerate(model_files):
+    #     print(f"{idx+1}. {file}")
+    # train_file = input("File number to load as training, or enter 'y' to use train file name: ")
+    # if(train_file.isnumeric() and int(train_file) <= len(model_files)):
+    #     data_output_file = model_dir + model_files[int(train_file)-1] + ".model"
+    # else:
+    #     if(train_file == 'y'):
+    #         data_output_file = model_dir + data_loader.get_chosen_files()[0] + '.model'
+    #     else:
+    #         data_output_file = model_dir + train_file + ".model"
+    #     if(data_output_file[-6:] != ".model"):
+        with open(data_output_file, 'wb') as f:
+            pickle.dump(data_package, f)

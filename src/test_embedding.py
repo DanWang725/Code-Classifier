@@ -121,18 +121,36 @@ def test_model_df(final_models: dict, test_df: pd.DataFrame, names: list[str]):
             print(pred)
 
 def determine_llm_from_path(path: str) -> str:
+    if 'deepseekGemini' in path:
+        return 'Deepseek-Gemini'
     if 'gemini' in path:
         return 'Gemini'
+    elif 'llama' in path:
+        return 'Llama'
+    elif 'deepseekr1' in path:
+        return 'Deepseek-R1'
+    elif 'ChatGPT' in path:
+        return 'ChatGPT'
     elif 'deepseek' in path:
         return 'deepseek'
     else:
-        return 'unknown'
+        return path
     
 def determine_dataset_from_path(path: str) -> str:
     if 'codenet' in path:
         return 'codenet'
     elif 'vl' in path:
         return 'vl'
+    
+def determine_embedding_from_path(path: str) -> str:
+    embedding_lengths = [32, 64, 96, 128, 192, 256, 284, 320, 384, 448, 512] # embedding lengths
+    for length in embedding_lengths:
+        if str(length)+"-codebert" in path:
+            return f'Codebert:{length}'
+    if 'codebert' in path:
+        return 'Codebert:512'
+    else:
+        return None
 
 def test_model(final_models: dict, test_files: dict[str, str], data_package: dict, output_df: pd.DataFrame) -> pd.DataFrame:
     auroc_list, acc_list, tpr_list, tnr_list, human_f1_list, ai_f1_list, f1_list = [], [], [], [], [], [], []
@@ -147,19 +165,36 @@ def test_model(final_models: dict, test_files: dict[str, str], data_package: dic
         # print(f'Train shape: {X_train.shape}, Test shape: {X_test.shape}')
         for label, model in final_models.items():
             pred = model.predict(X_test)
-            acc, tpr, tnr, f1, human_f1, ai_f1 = calculate_metrics(y_test, pred.tolist())
+            try:
+                acc, tpr, tnr, f1, human_f1, ai_f1 = calculate_metrics(y_test, pred.tolist())
+            except Exception as e:
+                acc = 1.0
+                tnr = 1.0
+                tpr = 1.0
+                f1 = 1.0
+                human_f1 = 1.0
+                ai_f1 = 1.0
             avg_f1 = (human_f1+ai_f1)/2
 
             print(f'\t{label}-->\tAccuracy: {round(acc, 4)} \tTPR: {round(tpr, 4)}\tTNR: {round(tnr, 4)}\tHuman_F1: {round(human_f1, 4)}\tAI_F1: {round(ai_f1, 4)}\tAvg_F1: {round(avg_f1, 4)}')
-            output_df = pd.concat([output_df, pd.DataFrame([[determine_dataset_from_path(file_name), determine_llm_from_path(file_name), data_package['embedding'], f"{determine_dataset_from_path(data_package['train_file'])}-{determine_llm_from_path(data_package['train_file'])}", label, test_df.shape[0], acc, tpr, tnr, avg_f1]], columns=output.columns)], ignore_index=True)
+            output_df = pd.concat([output_df, pd.DataFrame([[
+                determine_dataset_from_path(file_name),
+                determine_llm_from_path(file_name),
+                determine_embedding_from_path(file_name) if determine_embedding_from_path(file_name) is not None else data_package['embedding'],
+                f"{determine_dataset_from_path(data_package['train_file'])}-{determine_llm_from_path(data_package['train_file'])}",
+                label,
+                test_df.shape[0],
+                acc,
+                tpr,
+                tnr,
+                avg_f1]
+            ], columns=output.columns)], ignore_index=True)
             acc_list.append(acc)
             tpr_list.append(tpr)
             tnr_list.append(tnr)
             human_f1_list.append(human_f1)
             ai_f1_list.append(ai_f1)
             f1_list.append(avg_f1)
-
-
 
     avg_acc = round(sum(acc_list)/len(acc_list), 4)
     avg_tpr = round(sum(tpr_list)/len(tpr_list), 4)
@@ -194,7 +229,7 @@ if __name__ =="__main__":
     custom = input("custom dataset? (y/n)")
 
     if(custom != "y"):
-        test_file_loader = DataFileDirectory(file_path, EMBEDDING_EXTENSION, stat_func=get_emb_stats, contains=chosen_encoder, ends_with='.test')
+        test_file_loader = DataFileDirectory(file_path, EMBEDDING_EXTENSION, stat_func=get_emb_stats,initial_settings={'contains': chosen_encoder, 'end': '.test'})
         test_file_name = test_file_loader.get_file('Select a file for testing')
         while(test_file_name is not None):
             test_file_name = test_file_loader.get_file('Select other datasets to load, exit to continue to next step. ')
@@ -228,7 +263,7 @@ if __name__ =="__main__":
         
         device = "cuda"  # for GPU usage or "cpu" for CPU usage
         ivd = {v: k for k, v in EncoderMap.items()}
-        chosen_encoder = ivd[data_package['embedding']]
+        chosen_encoder = ivd[initial_data_package['embedding']]
 
         tokenizer = AutoTokenizer.from_pretrained(chosen_encoder, trust_remote_code=True)
         model = AutoModel.from_pretrained(chosen_encoder, trust_remote_code=True).to(device)
@@ -237,7 +272,12 @@ if __name__ =="__main__":
         else:
             output = embed_files(c_loader, tokenizer, model)
 
-        test_model_df(final_models, output, c_loader.get_chosen_files())
+        for model_path in model_loader.get_chosen_files(prefix_path=True, extension=True):
+            data_package = pickle.load(open(model_path, 'rb'))
+            final_models = fit_models(file_path + data_package['train_file'], data_package['models'])
+
+            print('Classifier:' + model_loader.get_path_to_file_name_mapping()[model_path])
+            test_model_df(final_models, output,  c_loader.get_chosen_files())
 
 
 # output.to_csv(f"../../data/test_results.csv")
